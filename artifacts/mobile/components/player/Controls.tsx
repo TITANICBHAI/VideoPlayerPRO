@@ -27,6 +27,7 @@ import Colors from "@/constants/colors";
 import { usePlayer } from "@/context/PlayerContext";
 import { PillButton } from "./PillButton";
 import { ProgressBar } from "./ProgressBar";
+import { SleepTimerBadge } from "./SleepTimerBadge";
 
 const C = Colors.dark;
 const HIDE_DELAY = 3500;
@@ -37,13 +38,22 @@ type Props = {
 };
 
 export function Controls({ onSeek, onSeekRelative }: Props) {
-  const { state, togglePlay, toggleMute, setPlaybackRate, toggleSettings, setFullscreen, toggleLock, setLoopMode, setShowControls } = usePlayer();
+  const {
+    state,
+    togglePlay,
+    toggleMute,
+    setPlaybackRate,
+    toggleSettings,
+    setFullscreen,
+    toggleLock,
+    setLoopMode,
+    setShowControls,
+  } = usePlayer();
   const insets = useSafeAreaInsets();
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [holdingFast, setHoldingFast] = useState(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevRate = useRef(state.playbackRate);
-
   const opacity = useSharedValue(1);
 
   const resetHideTimer = useCallback(() => {
@@ -60,9 +70,7 @@ export function Controls({ onSeek, onSeekRelative }: Props) {
 
   useEffect(() => {
     resetHideTimer();
-    return () => {
-      if (hideTimer.current) clearTimeout(hideTimer.current);
-    };
+    return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
   }, [state.isPlaying, state.showSettings]);
 
   useEffect(() => {
@@ -100,7 +108,7 @@ export function Controls({ onSeek, onSeekRelative }: Props) {
     holdTimer.current = setTimeout(() => {
       setHoldingFast(true);
       setPlaybackRate(2);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     }, 400);
   };
 
@@ -132,11 +140,9 @@ export function Controls({ onSeek, onSeekRelative }: Props) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const loopIcon = state.loopMode === "none" ? "repeat" : state.loopMode === "one" ? "repeat-once" : "repeat";
-  const loopActive = state.loopMode !== "none";
-
   const handleLoop = () => {
-    const next = state.loopMode === "none" ? "one" : state.loopMode === "one" ? "all" : "none";
+    const next =
+      state.loopMode === "none" ? "one" : state.loopMode === "one" ? "all" : "none";
     setLoopMode(next as any);
     resetHideTimer();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -144,25 +150,32 @@ export function Controls({ onSeek, onSeekRelative }: Props) {
 
   const topInset = state.isFullscreen ? insets.top : 0;
   const bottomInset = state.isFullscreen ? insets.bottom : 0;
+  const loopActive = state.loopMode !== "none";
+  const loopIcon = state.loopMode === "one" ? "repeat-once" : "repeat";
 
   return (
     <Pressable
       style={StyleSheet.absoluteFill}
       onPress={handlePressArea}
-      onLongPress={() => {}}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
     >
       <Animated.View style={[StyleSheet.absoluteFill, animStyle, styles.container]}>
         {state.isLocked ? (
-          <View style={[styles.lockOverlay, { top: topInset + 12 }]}>
-            <PillButton onPress={() => { toggleLock(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}>
+          <View style={[styles.lockOnly, { top: topInset + 12 }]}>
+            <PillButton
+              onPress={() => {
+                toggleLock();
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              }}
+            >
               <Ionicons name="lock-closed" size={14} color={C.accent} />
-              <Text style={{ color: C.text, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>Locked</Text>
+              <Text style={styles.lockText}>Locked — Tap to unlock</Text>
             </PillButton>
           </View>
         ) : (
           <>
+            {/* TOP BAR */}
             <View style={[styles.topBar, { paddingTop: topInset + 8 }]}>
               <View style={styles.topLeft}>
                 {state.currentVideo && (
@@ -178,6 +191,7 @@ export function Controls({ onSeek, onSeekRelative }: Props) {
                     <Text style={styles.fastBadgeText}>2x</Text>
                   </Animated.View>
                 )}
+                <SleepTimerBadge />
                 <PillButton onPress={() => { toggleLock(); resetHideTimer(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}>
                   <Ionicons name="lock-open-outline" size={14} color={C.text} />
                 </PillButton>
@@ -194,11 +208,11 @@ export function Controls({ onSeek, onSeekRelative }: Props) {
               </View>
             </View>
 
+            {/* CENTER CONTROLS */}
             <View style={styles.centerRow}>
               <PillButton onPress={handleBack10} style={styles.seekBtn}>
                 <MaterialIcons name="replay-10" size={26} color={C.text} />
               </PillButton>
-
               <PillButton onPress={handlePlay} style={styles.playBtn}>
                 <Ionicons
                   name={state.isPlaying ? "pause" : "play"}
@@ -206,12 +220,24 @@ export function Controls({ onSeek, onSeekRelative }: Props) {
                   color={C.text}
                 />
               </PillButton>
-
               <PillButton onPress={handleForward10} style={styles.seekBtn}>
                 <MaterialIcons name="forward-10" size={26} color={C.text} />
               </PillButton>
             </View>
 
+            {/* SWIPE HINT */}
+            {!state.isFullscreen && (
+              <View style={styles.swipeHintRow} pointerEvents="none">
+                <Text style={styles.swipeHintText}>swipe up for fullscreen</Text>
+              </View>
+            )}
+            {state.isFullscreen && (
+              <View style={styles.swipeHintRow} pointerEvents="none">
+                <Text style={styles.swipeHintText}>swipe down to exit</Text>
+              </View>
+            )}
+
+            {/* BOTTOM BAR */}
             <View style={[styles.bottomBar, { paddingBottom: bottomInset + 8 }]}>
               <ProgressBar onSeek={onSeek} />
               <View style={styles.bottomControls}>
@@ -222,15 +248,40 @@ export function Controls({ onSeek, onSeekRelative }: Props) {
                     color={C.text}
                   />
                 </PillButton>
-                <PillButton onPress={() => { setPlaybackRate(state.playbackRate === 1 ? 1.5 : 1); resetHideTimer(); }} label={`${state.playbackRate}x`}>
+                <PillButton
+                  onPress={() => {
+                    const rates = [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4] as const;
+                    const idx = rates.indexOf(state.playbackRate as any);
+                    const next = rates[(idx + 1) % rates.length];
+                    setPlaybackRate(next);
+                    resetHideTimer();
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  label={`${state.playbackRate}x`}
+                >
                   <Ionicons name="speedometer-outline" size={13} color={C.text} />
                 </PillButton>
                 <PillButton onPress={handleLoop} active={loopActive}>
-                  <MaterialCommunityIcons name={loopIcon} size={15} color={loopActive ? C.accent : C.text} />
+                  <MaterialCommunityIcons
+                    name={loopIcon}
+                    size={15}
+                    color={loopActive ? C.accent : C.text}
+                  />
                 </PillButton>
+                {state.audioNormalization && (
+                  <PillButton onPress={() => {}} active>
+                    <Ionicons name="volume-medium" size={13} color={C.accent} />
+                    <Text style={{ color: C.accent, fontSize: 9, fontFamily: "Inter_700Bold" }}>NRM</Text>
+                  </PillButton>
+                )}
                 {state.captionsEnabled && (
                   <PillButton onPress={() => {}} active>
                     <Ionicons name="text" size={14} color={C.accent} />
+                  </PillButton>
+                )}
+                {state.backgroundPlayback && (
+                  <PillButton onPress={() => {}} active>
+                    <Ionicons name="headset-outline" size={14} color="#80CBC4" />
                   </PillButton>
                 )}
               </View>
@@ -246,6 +297,15 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: "space-between",
     backgroundColor: "rgba(0,0,0,0.35)",
+  },
+  lockOnly: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lockText: {
+    color: C.text,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
   },
   topBar: {
     flexDirection: "row",
@@ -266,8 +326,9 @@ const styles = StyleSheet.create({
   },
   topRight: {
     flexDirection: "row",
-    gap: 6,
+    gap: 5,
     flexShrink: 0,
+    alignItems: "center",
   },
   centerRow: {
     flexDirection: "row",
@@ -289,8 +350,17 @@ const styles = StyleSheet.create({
     backgroundColor: C.controlBgActive,
     borderColor: C.borderStrong,
   },
+  swipeHintRow: {
+    alignItems: "center",
+    paddingBottom: 2,
+  },
+  swipeHintText: {
+    color: "rgba(255,255,255,0.25)",
+    fontSize: 9,
+    fontFamily: "Inter_400Regular",
+    letterSpacing: 0.5,
+  },
   bottomBar: {
-    paddingHorizontal: 0,
     gap: 8,
   },
   bottomControls: {
@@ -298,10 +368,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 16,
-  },
-  lockOverlay: {
-    alignItems: "flex-end",
-    paddingHorizontal: 12,
+    flexWrap: "wrap",
   },
   fastBadge: {
     flexDirection: "row",

@@ -12,20 +12,23 @@ export function StatsOverlay() {
   const { state, toggleStatsForNerds } = usePlayer();
   if (!state.showStatsForNerds) return null;
 
-  const bufferHealth = state.duration > 0
-    ? Math.max(0, state.buffered - state.currentTime).toFixed(1)
-    : "0.0";
+  const bufferSecs = state.duration > 0
+    ? Math.max(0, state.buffered - state.currentTime)
+    : 0;
+  const bufferMB = (bufferSecs * 0.5).toFixed(1);
 
   const rows = [
     { label: "Resolution", value: state.resolution },
     { label: "Codec", value: state.codec },
     { label: "Playback Speed", value: `${state.playbackRate}x` },
     { label: "Quality", value: state.quality },
-    { label: "Buffer Health", value: `${bufferHealth}s` },
-    { label: "Connection", value: `${(state.connectionSpeed).toFixed(0)} Kbps` },
+    { label: "Buffer Health", value: `${bufferMB} MB (${bufferSecs.toFixed(1)}s)` },
+    { label: "Connection", value: `${(state.connectionSpeed / 1000).toFixed(1)} Mbps` },
     { label: "Dropped Frames", value: `${state.droppedFrames}` },
+    { label: "Audio Track", value: state.audioTracks.find((t) => t.id === state.activeAudioTrack)?.label ?? "Default" },
+    { label: "Audio Norm.", value: state.audioNormalization ? "ON (VLC)" : "Off" },
     { label: "Duration", value: formatTime(state.duration) },
-    { label: "Current Time", value: formatTime(state.currentTime) },
+    { label: "Position", value: formatTime(state.currentTime) },
   ];
 
   return (

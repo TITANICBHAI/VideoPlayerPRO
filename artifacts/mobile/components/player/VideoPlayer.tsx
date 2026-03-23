@@ -18,6 +18,7 @@ import Animated, {
 import Colors from "@/constants/colors";
 import { usePlayer } from "@/context/PlayerContext";
 import { Controls } from "./Controls";
+import { GestureOverlay } from "./GestureOverlay";
 import { SeekIndicator } from "./SeekIndicator";
 import { SettingsSheet } from "./SettingsSheet";
 import { StatsOverlay } from "./StatsOverlay";
@@ -49,11 +50,8 @@ export function VideoPlayer() {
   useEffect(() => {
     if (!player) return;
     try {
-      if (state.isPlaying) {
-        player.play();
-      } else {
-        player.pause();
-      }
+      if (state.isPlaying) player.play();
+      else player.pause();
     } catch {}
   }, [state.isPlaying]);
 
@@ -76,7 +74,7 @@ export function VideoPlayer() {
     if (!player || !state.currentVideo) return;
     try {
       player.replace(state.currentVideo.uri);
-      setTimeout(() => player.play(), 100);
+      setTimeout(() => { try { player.play(); } catch {} }, 100);
     } catch {}
   }, [state.currentVideo?.id]);
 
@@ -86,19 +84,23 @@ export function VideoPlayer() {
       try {
         const ct = player.currentTime ?? 0;
         const dur = player.duration ?? 0;
+        // Simulated buffer health (in a real app, use player buffer events)
+        const bufferHealth = Math.min(dur, ct + Math.random() * 30 + 10);
+        const bufferMB = (Math.random() * 8 + 2).toFixed(1);
         updatePlaybackInfo({
           currentTime: ct,
           duration: dur > 0 ? dur : state.duration,
+          buffered: bufferHealth,
           isLoading: false,
           connectionSpeed: Math.random() * 5000 + 2000,
           droppedFrames: Math.floor(Math.random() * 2),
           resolution: "1920x1080",
-          codec: "H.264 (AVC)",
+          codec: state.audioNormalization ? "H.264 (Normalized)" : "H.264 (AVC)",
         });
       } catch {}
     }, 500);
     return () => clearInterval(interval);
-  }, [player, state.duration]);
+  }, [player, state.duration, state.audioNormalization]);
 
   useEffect(() => {
     ambientOpacity.value = withTiming(state.ambientMode ? 0.7 : 0, { duration: 1000 });
@@ -178,6 +180,8 @@ export function VideoPlayer() {
     ? SCREEN_W * (9 / 16) * 1.2
     : SCREEN_W * (9 / 16);
 
+  const contentFit = state.fitMode === "cover" ? "cover" : "contain";
+
   return (
     <View
       style={[
@@ -188,26 +192,31 @@ export function VideoPlayer() {
     >
       {state.ambientMode && (
         <Animated.View
-          style={[styles.ambientGlow, ambientStyle, { pointerEvents: "none" }]}
+          style={[styles.ambientGlow, ambientStyle, { pointerEvents: "none" as any }]}
         />
       )}
 
       <VideoView
         player={player}
         style={StyleSheet.absoluteFill}
-        contentFit="contain"
+        contentFit={contentFit}
         nativeControls={false}
       />
 
-      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-        <GestureDetector gesture={doubleTapLeft}>
-          <View style={styles.leftZone} />
-        </GestureDetector>
-        <GestureDetector gesture={doubleTapRight}>
-          <View style={styles.rightZone} />
-        </GestureDetector>
-      </View>
+      {/* Gesture overlay: swipe up/down fullscreen + brightness/volume swipe */}
+      <GestureOverlay onSeekRelative={handleSeekRelative}>
+        {/* Double-tap zones inside gesture overlay */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <GestureDetector gesture={doubleTapLeft}>
+            <View style={styles.leftZone} />
+          </GestureDetector>
+          <GestureDetector gesture={doubleTapRight}>
+            <View style={styles.rightZone} />
+          </GestureDetector>
+        </View>
+      </GestureOverlay>
 
+      {/* Controls layer */}
       <Controls onSeek={handleSeek} onSeekRelative={handleSeekRelative} />
 
       <SeekIndicator direction="left" seconds={10} visible={seekLeft} />
@@ -249,13 +258,13 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: "30%",
+    width: "28%",
   },
   rightZone: {
     position: "absolute",
     right: 0,
     top: 0,
     bottom: 0,
-    width: "30%",
+    width: "28%",
   },
 });

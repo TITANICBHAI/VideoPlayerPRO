@@ -14,9 +14,11 @@ import Animated, {
 import Colors from "@/constants/colors";
 import { usePlayer } from "@/context/PlayerContext";
 import type { Chapter } from "@/context/PlayerContext";
+import { SeekThumbnailStrip } from "./SeekThumbnailStrip";
 import { formatTime } from "@/utils/format";
 
 const C = Colors.dark;
+const THUMBNAIL_LIFT_THRESHOLD = 20;
 
 type Props = {
   onSeek: (time: number) => void;
@@ -27,9 +29,11 @@ export function ProgressBar({ onSeek }: Props) {
   const { currentTime, duration, buffered, isFullscreen } = state;
   const [isDragging, setIsDragging] = useState(false);
   const [dragTime, setDragTime] = useState(0);
+  const [showThumbnails, setShowThumbnails] = useState(false);
   const barRef = useRef<View>(null);
   const barX = useRef(0);
   const barW = useRef(1);
+  const startDragY = useRef(0);
   const thumbScale = useSharedValue(1);
 
   const chapters: Chapter[] = state.currentVideo?.chapters ?? [];
@@ -55,22 +59,32 @@ export function ProgressBar({ onSeek }: Props) {
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (e) => {
         setIsDragging(true);
+        startDragY.current = e.nativeEvent.pageY;
         thumbScale.value = withSpring(1.4);
         const t = getTimeFromX(e.nativeEvent.pageX);
         setDragTime(t);
+        setShowThumbnails(false);
       },
       onPanResponderMove: (e) => {
         const t = getTimeFromX(e.nativeEvent.pageX);
         setDragTime(t);
+        const verticalDelta = startDragY.current - e.nativeEvent.pageY;
+        if (verticalDelta > THUMBNAIL_LIFT_THRESHOLD) {
+          setShowThumbnails(true);
+        } else if (verticalDelta < 5) {
+          setShowThumbnails(false);
+        }
       },
       onPanResponderRelease: (e) => {
         const t = getTimeFromX(e.nativeEvent.pageX);
         onSeek(t);
         setIsDragging(false);
+        setShowThumbnails(false);
         thumbScale.value = withSpring(1);
       },
       onPanResponderTerminate: () => {
         setIsDragging(false);
+        setShowThumbnails(false);
         thumbScale.value = withSpring(1);
       },
     })
@@ -80,30 +94,49 @@ export function ProgressBar({ onSeek }: Props) {
     transform: [{ scale: thumbScale.value }],
   }));
 
-  return (
-    <View style={styles.wrapper}>
-      <View style={styles.timesRow}>
-        <Text style={styles.timeText}>
-          {formatTime(isDragging ? dragTime : currentTime)}
-        </Text>
-        <Text style={styles.timeText}>{formatTime(duration)}</Text>
-      </View>
+  const currentChapter = chapters.length > 0
+    ? [...chapters].reverse().find((c) => c.startTime <= (isDragging ? dragTime : currentTime))
+    : null;
 
-      <View
-        ref={barRef}
-        onLayout={onLayout}
-        style={[styles.track, isFullscreen && styles.trackFullscreen]}
-        {...panResponder.panHandlers}
-      >
-        <View style={styles.trackBg}>
-          <View style={[styles.bufferFill, { width: `${bufferProgress * 100}%` }]} />
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]}>
-            <Animated.View style={[styles.thumb, thumbStyle]} />
+  return (
+    <>
+      <SeekThumbnailStrip
+        visible={showThumbnails}
+        currentTime={currentTime}
+        duration={duration}
+        seekTime={dragTime}
+      />
+
+      <View style={styles.wrapper}>
+        {currentChapter && (
+          <View style={styles.chapterLabel}>
+            <Text style={styles.chapterLabelText} numberOfLines={1}>
+              {currentChapter.title}
+            </Text>
           </View>
+        )}
+
+        <View style={styles.timesRow}>
+          <Text style={styles.timeText}>
+            {formatTime(isDragging ? dragTime : currentTime)}
+          </Text>
+          <Text style={styles.timeText}>{formatTime(duration)}</Text>
         </View>
 
-        {chapters.length > 0 &&
-          chapters.map((ch, i) => {
+        <View
+          ref={barRef}
+          onLayout={onLayout}
+          style={[styles.track, isFullscreen && styles.trackFullscreen]}
+          {...panResponder.panHandlers}
+        >
+          <View style={styles.trackBg}>
+            <View style={[styles.bufferFill, { width: `${bufferProgress * 100}%` }]} />
+            <View style={[styles.progressFill, { width: `${progress * 100}%` }]}>
+              <Animated.View style={[styles.thumb, thumbStyle]} />
+            </View>
+          </View>
+
+          {chapters.map((ch, i) => {
             const pos = duration > 0 ? ch.startTime / duration : 0;
             if (pos <= 0 || pos >= 1) return null;
             return (
@@ -113,19 +146,15 @@ export function ProgressBar({ onSeek }: Props) {
               />
             );
           })}
-      </View>
+        </View>
 
-      {isDragging && chapters.length > 0 && (() => {
-        const t = dragTime;
-        const ch = [...chapters].reverse().find((c) => c.startTime <= t);
-        if (!ch) return null;
-        return (
-          <View style={styles.chapterTooltip}>
-            <Text style={styles.chapterTooltipText}>{ch.title}</Text>
+        {isDragging && (
+          <View style={styles.dragHint}>
+            <Text style={styles.dragHintText}>Slide up for preview</Text>
           </View>
-        );
-      })()}
-    </View>
+        )}
+      </View>
+    </>
   );
 }
 
@@ -133,6 +162,15 @@ const styles = StyleSheet.create({
   wrapper: {
     width: "100%",
     paddingHorizontal: 16,
+  },
+  chapterLabel: {
+    marginBottom: 2,
+  },
+  chapterLabelText: {
+    color: C.accent,
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.3,
   },
   timesRow: {
     flexDirection: "row",
@@ -178,35 +216,29 @@ const styles = StyleSheet.create({
     overflow: "visible",
   },
   thumb: {
-    width: 13,
-    height: 13,
+    width: 14,
+    height: 14,
     borderRadius: 7,
     backgroundColor: C.scrubber,
     position: "absolute",
-    right: -6.5,
+    right: -7,
     elevation: 4,
   },
   chapterMark: {
     position: "absolute",
     width: 2,
     height: 6,
-    backgroundColor: "rgba(255,255,255,0.5)",
+    backgroundColor: "rgba(255,255,255,0.45)",
     borderRadius: 1,
     top: -1.5,
   },
-  chapterTooltip: {
-    alignSelf: "flex-start",
+  dragHint: {
+    alignItems: "center",
     marginTop: 4,
-    backgroundColor: C.surfaceGlass,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: C.border,
   },
-  chapterTooltipText: {
-    color: C.text,
-    fontSize: 10,
-    fontFamily: "Inter_500Medium",
+  dragHintText: {
+    color: C.textMuted,
+    fontSize: 9,
+    fontFamily: "Inter_400Regular",
   },
 });

@@ -25,14 +25,20 @@ export type Chapter = {
 
 export type PlaybackSpeed = 0.25 | 0.5 | 0.75 | 1 | 1.25 | 1.5 | 1.75 | 2 | 2.5 | 3 | 4;
 export type VideoQuality = "Auto" | "144p" | "240p" | "360p" | "480p" | "720p" | "1080p" | "4K";
+export type FitMode = "contain" | "cover";
+
+export type AudioTrack = { id: string; label: string; language: string };
+export type SubtitleTrack = { id: string; label: string; language: string } | null;
 
 export type PlayerState = {
   currentVideo: VideoItem | null;
   isPlaying: boolean;
   isMuted: boolean;
   volume: number;
+  brightness: number;
   playbackRate: PlaybackSpeed;
   quality: VideoQuality;
+  fitMode: FitMode;
   currentTime: number;
   duration: number;
   buffered: number;
@@ -50,6 +56,14 @@ export type PlayerState = {
   codec: string;
   resolution: string;
   connectionSpeed: number;
+  audioTracks: AudioTrack[];
+  activeAudioTrack: string;
+  subtitleTracks: SubtitleTrack[];
+  activeSubtitleTrack: string | null;
+  audioNormalization: boolean;
+  backgroundPlayback: boolean;
+  sleepTimerMinutes: number | null;
+  sleepTimerRemaining: number | null;
 };
 
 type PlayerContextType = {
@@ -61,8 +75,10 @@ type PlayerContextType = {
   togglePlay: () => void;
   toggleMute: () => void;
   setVolume: (v: number) => void;
+  setBrightness: (v: number) => void;
   setPlaybackRate: (rate: PlaybackSpeed) => void;
   setQuality: (q: VideoQuality) => void;
+  setFitMode: (m: FitMode) => void;
   seekTo: (time: number) => void;
   seekRelative: (delta: number) => void;
   setFullscreen: (v: boolean) => void;
@@ -74,6 +90,11 @@ type PlayerContextType = {
   toggleTheaterMode: () => void;
   toggleLock: () => void;
   setLoopMode: (m: "none" | "one" | "all") => void;
+  setAudioTrack: (id: string) => void;
+  setSubtitleTrack: (id: string | null) => void;
+  toggleAudioNormalization: () => void;
+  toggleBackgroundPlayback: () => void;
+  setSleepTimer: (minutes: number | null) => void;
   updatePlaybackInfo: (info: Partial<PlayerState>) => void;
   resetPlayer: () => void;
 };
@@ -82,13 +103,30 @@ const PlayerContext = createContext<PlayerContextType | null>(null);
 
 const STORAGE_KEY = "@videoplayer_videos";
 
+const DEFAULT_AUDIO_TRACKS: AudioTrack[] = [
+  { id: "1", label: "English", language: "en" },
+  { id: "2", label: "Hindi", language: "hi" },
+  { id: "3", label: "Japanese", language: "ja" },
+  { id: "4", label: "Spanish", language: "es" },
+];
+
+const DEFAULT_SUBTITLE_TRACKS: SubtitleTrack[] = [
+  null,
+  { id: "s1", label: "English (CC)", language: "en" },
+  { id: "s2", label: "Hindi", language: "hi" },
+  { id: "s3", label: "Spanish", language: "es" },
+  { id: "s4", label: "French", language: "fr" },
+];
+
 const DEFAULT_STATE: PlayerState = {
   currentVideo: null,
   isPlaying: false,
   isMuted: false,
   volume: 1,
+  brightness: 0.8,
   playbackRate: 1,
   quality: "Auto",
+  fitMode: "contain",
   currentTime: 0,
   duration: 0,
   buffered: 0,
@@ -106,6 +144,14 @@ const DEFAULT_STATE: PlayerState = {
   codec: "H.264",
   resolution: "1920x1080",
   connectionSpeed: 0,
+  audioTracks: DEFAULT_AUDIO_TRACKS,
+  activeAudioTrack: "1",
+  subtitleTracks: DEFAULT_SUBTITLE_TRACKS,
+  activeSubtitleTrack: null,
+  audioNormalization: false,
+  backgroundPlayback: false,
+  sleepTimerMinutes: null,
+  sleepTimerRemaining: null,
 };
 
 const SAMPLE_VIDEOS: VideoItem[] = [
@@ -175,11 +221,35 @@ const SAMPLE_VIDEOS: VideoItem[] = [
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<PlayerState>(DEFAULT_STATE);
   const [videos, setVideos] = useState<VideoItem[]>(SAMPLE_VIDEOS);
-  const seekRef = useRef<((t: number) => void) | null>(null);
+  const sleepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     loadVideos();
   }, []);
+
+  // Sleep timer countdown
+  useEffect(() => {
+    if (state.sleepTimerRemaining === null) {
+      if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
+      return;
+    }
+    if (state.sleepTimerRemaining <= 0) {
+      setState((prev) => ({ ...prev, isPlaying: false, sleepTimerMinutes: null, sleepTimerRemaining: null }));
+      if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
+      return;
+    }
+    sleepTimerRef.current = setInterval(() => {
+      setState((prev) => {
+        const next = (prev.sleepTimerRemaining ?? 1) - 1;
+        if (next <= 0) {
+          if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
+          return { ...prev, isPlaying: false, sleepTimerMinutes: null, sleepTimerRemaining: null };
+        }
+        return { ...prev, sleepTimerRemaining: next };
+      });
+    }, 1000);
+    return () => { if (sleepTimerRef.current) clearInterval(sleepTimerRef.current); };
+  }, [state.sleepTimerRemaining !== null]);
 
   const loadVideos = async () => {
     try {
@@ -188,8 +258,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const saved = JSON.parse(raw) as VideoItem[];
         setVideos((prev) => {
           const savedIds = new Set(saved.map((v) => v.id));
-          const combined = [...prev.filter((v) => !savedIds.has(v.id)), ...saved];
-          return combined;
+          return [...prev.filter((v) => !savedIds.has(v.id)), ...saved];
         });
       }
     } catch {}
@@ -197,9 +266,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const saveVideos = async (list: VideoItem[]) => {
     try {
-      const userAdded = list.filter(
-        (v) => !SAMPLE_VIDEOS.find((s) => s.id === v.id)
-      );
+      const userAdded = list.filter((v) => !SAMPLE_VIDEOS.find((s) => s.id === v.id));
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(userAdded));
     } catch {}
   };
@@ -233,113 +300,54 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const togglePlay = useCallback(() => {
-    setState((prev) => ({ ...prev, isPlaying: !prev.isPlaying }));
-  }, []);
-
-  const toggleMute = useCallback(() => {
-    setState((prev) => ({ ...prev, isMuted: !prev.isMuted }));
-  }, []);
-
-  const setVolume = useCallback((v: number) => {
-    setState((prev) => ({ ...prev, volume: v, isMuted: v === 0 }));
-  }, []);
-
-  const setPlaybackRate = useCallback((rate: PlaybackSpeed) => {
-    setState((prev) => ({ ...prev, playbackRate: rate }));
-  }, []);
-
-  const setQuality = useCallback((q: VideoQuality) => {
-    setState((prev) => ({ ...prev, quality: q }));
-  }, []);
-
-  const seekTo = useCallback((time: number) => {
-    setState((prev) => ({ ...prev, currentTime: time }));
-  }, []);
-
-  const seekRelative = useCallback((delta: number) => {
-    setState((prev) => ({
-      ...prev,
-      currentTime: Math.max(0, Math.min(prev.duration, prev.currentTime + delta)),
+  const togglePlay = useCallback(() => setState((p) => ({ ...p, isPlaying: !p.isPlaying })), []);
+  const toggleMute = useCallback(() => setState((p) => ({ ...p, isMuted: !p.isMuted })), []);
+  const setVolume = useCallback((v: number) => setState((p) => ({ ...p, volume: v, isMuted: v === 0 })), []);
+  const setBrightness = useCallback((v: number) => setState((p) => ({ ...p, brightness: Math.max(0.05, Math.min(1, v)) })), []);
+  const setPlaybackRate = useCallback((rate: PlaybackSpeed) => setState((p) => ({ ...p, playbackRate: rate })), []);
+  const setQuality = useCallback((q: VideoQuality) => setState((p) => ({ ...p, quality: q })), []);
+  const setFitMode = useCallback((m: FitMode) => setState((p) => ({ ...p, fitMode: m })), []);
+  const seekTo = useCallback((time: number) => setState((p) => ({ ...p, currentTime: time })), []);
+  const seekRelative = useCallback((delta: number) => setState((p) => ({
+    ...p, currentTime: Math.max(0, Math.min(p.duration, p.currentTime + delta)),
+  })), []);
+  const setFullscreen = useCallback((v: boolean) => setState((p) => ({ ...p, isFullscreen: v })), []);
+  const setShowControls = useCallback((v: boolean) => setState((p) => ({ ...p, showControls: v })), []);
+  const toggleSettings = useCallback(() => setState((p) => ({ ...p, showSettings: !p.showSettings })), []);
+  const toggleStatsForNerds = useCallback(() => setState((p) => ({ ...p, showStatsForNerds: !p.showStatsForNerds, showSettings: false })), []);
+  const toggleCaptions = useCallback(() => setState((p) => ({ ...p, captionsEnabled: !p.captionsEnabled })), []);
+  const toggleAmbientMode = useCallback(() => setState((p) => ({ ...p, ambientMode: !p.ambientMode })), []);
+  const toggleTheaterMode = useCallback(() => setState((p) => ({ ...p, isTheaterMode: !p.isTheaterMode })), []);
+  const toggleLock = useCallback(() => setState((p) => ({ ...p, isLocked: !p.isLocked })), []);
+  const setLoopMode = useCallback((m: "none" | "one" | "all") => setState((p) => ({ ...p, loopMode: m })), []);
+  const setAudioTrack = useCallback((id: string) => setState((p) => ({ ...p, activeAudioTrack: id })), []);
+  const setSubtitleTrack = useCallback((id: string | null) => setState((p) => ({ ...p, activeSubtitleTrack: id, captionsEnabled: id !== null })), []);
+  const toggleAudioNormalization = useCallback(() => setState((p) => ({ ...p, audioNormalization: !p.audioNormalization })), []);
+  const toggleBackgroundPlayback = useCallback(() => setState((p) => ({ ...p, backgroundPlayback: !p.backgroundPlayback })), []);
+  const setSleepTimer = useCallback((minutes: number | null) => {
+    setState((p) => ({
+      ...p,
+      sleepTimerMinutes: minutes,
+      sleepTimerRemaining: minutes !== null ? minutes * 60 : null,
     }));
   }, []);
-
-  const setFullscreen = useCallback((v: boolean) => {
-    setState((prev) => ({ ...prev, isFullscreen: v }));
-  }, []);
-
-  const setShowControls = useCallback((v: boolean) => {
-    setState((prev) => ({ ...prev, showControls: v }));
-  }, []);
-
-  const toggleSettings = useCallback(() => {
-    setState((prev) => ({ ...prev, showSettings: !prev.showSettings }));
-  }, []);
-
-  const toggleStatsForNerds = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      showStatsForNerds: !prev.showStatsForNerds,
-      showSettings: false,
-    }));
-  }, []);
-
-  const toggleCaptions = useCallback(() => {
-    setState((prev) => ({ ...prev, captionsEnabled: !prev.captionsEnabled }));
-  }, []);
-
-  const toggleAmbientMode = useCallback(() => {
-    setState((prev) => ({ ...prev, ambientMode: !prev.ambientMode }));
-  }, []);
-
-  const toggleTheaterMode = useCallback(() => {
-    setState((prev) => ({ ...prev, isTheaterMode: !prev.isTheaterMode }));
-  }, []);
-
-  const toggleLock = useCallback(() => {
-    setState((prev) => ({ ...prev, isLocked: !prev.isLocked }));
-  }, []);
-
-  const setLoopMode = useCallback((m: "none" | "one" | "all") => {
-    setState((prev) => ({ ...prev, loopMode: m }));
-  }, []);
-
-  const updatePlaybackInfo = useCallback((info: Partial<PlayerState>) => {
-    setState((prev) => ({ ...prev, ...info }));
-  }, []);
-
-  const resetPlayer = useCallback(() => {
-    setState(DEFAULT_STATE);
-  }, []);
+  const updatePlaybackInfo = useCallback((info: Partial<PlayerState>) => setState((p) => ({ ...p, ...info })), []);
+  const resetPlayer = useCallback(() => setState(DEFAULT_STATE), []);
 
   return (
-    <PlayerContext.Provider
-      value={{
-        state,
-        videos,
-        addVideo,
-        removeVideo,
-        playVideo,
-        togglePlay,
-        toggleMute,
-        setVolume,
-        setPlaybackRate,
-        setQuality,
-        seekTo,
-        seekRelative,
-        setFullscreen,
-        setShowControls,
-        toggleSettings,
-        toggleStatsForNerds,
-        toggleCaptions,
-        toggleAmbientMode,
-        toggleTheaterMode,
-        toggleLock,
-        setLoopMode,
-        updatePlaybackInfo,
-        resetPlayer,
-      }}
-    >
+    <PlayerContext.Provider value={{
+      state, videos,
+      addVideo, removeVideo, playVideo,
+      togglePlay, toggleMute, setVolume, setBrightness,
+      setPlaybackRate, setQuality, setFitMode,
+      seekTo, seekRelative,
+      setFullscreen, setShowControls,
+      toggleSettings, toggleStatsForNerds, toggleCaptions,
+      toggleAmbientMode, toggleTheaterMode, toggleLock,
+      setLoopMode, setAudioTrack, setSubtitleTrack,
+      toggleAudioNormalization, toggleBackgroundPlayback,
+      setSleepTimer, updatePlaybackInfo, resetPlayer,
+    }}>
       {children}
     </PlayerContext.Provider>
   );

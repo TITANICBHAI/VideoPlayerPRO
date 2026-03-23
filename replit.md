@@ -66,6 +66,18 @@ Full-featured YouTube + VLC style video player for Android/iOS.
 - `artifacts/mobile/app/(tabs)/index.tsx` — Library home screen
 - `artifacts/mobile/app/player.tsx` — Full player screen with chapters
 
+### New Features (2026 Edition)
+- **Swipe Up/Down for Fullscreen**: Swipe up (center) to enter fullscreen, swipe down to exit
+- **Volume/Brightness Gesture**: Swipe up/down on the left edge (brightness) or right edge (volume)
+- **Seek Thumbnail Preview Strip**: Lift finger up while scrubbing the progress bar to reveal thumbnail strip
+- **Audio Track Selection**: Language menu in settings (English, Hindi, Japanese, Spanish)
+- **Subtitle Track Selection**: Full subtitle track list with on/off toggle per track
+- **Sleep Timer**: 5–90 min timer with live countdown badge on player controls
+- **Audio Normalization**: VLC-style stable volume toggle (shown in stats overlay when active)
+- **Background Playback Toggle**: Toggle continuous audio when app is minimized
+- **Screen Fit Mode**: Contain (letterbox) or Cover (crop to fill) in settings
+- **NRM badge**: Active audio normalization shows pill badge in controls
+
 ### Packages Used
 - `expo-video@~3.0.16` — Core video playback
 - `expo-screen-orientation@~9.0.8` — Landscape/portrait rotation
