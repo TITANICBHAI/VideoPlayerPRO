@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "expo-av": "^16.0.8",
+    "expo-dev-client": "~6.0.20",
     "expo-media-library": "^18.2.1",
     "expo-screen-orientation": "^9.0.8",
     "expo-video": "^3.0.16"
