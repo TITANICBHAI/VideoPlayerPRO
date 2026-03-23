@@ -1,0 +1,31 @@
+const DARK = {
+  background: "#0A0A0A",
+  surface: "#161616",
+  surfaceElevated: "#1E1E1E",
+  surfaceGlass: "rgba(22, 22, 22, 0.85)",
+  border: "rgba(255, 255, 255, 0.08)",
+  borderStrong: "rgba(255, 255, 255, 0.15)",
+  text: "#FFFFFF",
+  textSecondary: "rgba(255, 255, 255, 0.65)",
+  textMuted: "rgba(255, 255, 255, 0.35)",
+  accent: "#FF0033",
+  accentSoft: "rgba(255, 0, 51, 0.2)",
+  accentGlow: "rgba(255, 0, 51, 0.4)",
+  controlBg: "rgba(255, 255, 255, 0.12)",
+  controlBgActive: "rgba(255, 255, 255, 0.2)",
+  overlay: "rgba(0, 0, 0, 0.7)",
+  overlayLight: "rgba(0, 0, 0, 0.4)",
+  progress: "#FF0033",
+  buffer: "rgba(255, 255, 255, 0.3)",
+  track: "rgba(255, 255, 255, 0.2)",
+  scrubber: "#FFFFFF",
+  tabBar: "#0A0A0A",
+  tint: "#FF0033",
+  tabIconDefault: "rgba(255, 255, 255, 0.35)",
+  tabIconSelected: "#FF0033",
+};
+
+export default {
+  dark: DARK,
+  light: DARK,
+};
