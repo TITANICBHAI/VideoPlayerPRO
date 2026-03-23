@@ -20,7 +20,8 @@
       }
     },
     "android": {
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "pan",
+      "package": "com.videoplayer.app"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -40,6 +41,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "878ec02f-bc26-41aa-8856-9f080b034268"
+      }
     }
   }
 }
