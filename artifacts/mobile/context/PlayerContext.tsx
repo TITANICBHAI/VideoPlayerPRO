@@ -187,7 +187,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const subscription = MediaLibrary.addChangeListener(() => {
+    const subscription = MediaLibrary.addListener(() => {
       refreshDeviceVideos();
     });
     return () => subscription.remove();
