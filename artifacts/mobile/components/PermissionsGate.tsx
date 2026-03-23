@@ -3,7 +3,6 @@ import * as Haptics from "expo-haptics";
 import * as MediaLibrary from "expo-media-library";
 import React, { useEffect, useState } from "react";
 import {
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -23,7 +22,7 @@ type Props = {
 export function PermissionsGate({ children }: Props) {
   const [ready, setReady] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [permissionStatus, requestPermission] = MediaLibrary.usePermissions();
+  const [, requestPermission] = MediaLibrary.usePermissions();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -31,10 +30,6 @@ export function PermissionsGate({ children }: Props) {
   }, []);
 
   const checkOnboarding = async () => {
-    if (Platform.OS === "web") {
-      setReady(true);
-      return;
-    }
     try {
       const val = await AsyncStorage.getItem(ONBOARDED_KEY);
       if (val === "true") {
@@ -94,7 +89,7 @@ export function PermissionsGate({ children }: Props) {
           <View style={styles.permissionCard}>
             <Text style={styles.permissionTitle}>Media Library Access</Text>
             <Text style={styles.permissionDesc}>
-              VideoPlayer PRO would like access to your media library to let you save and share videos directly from the app.
+              VideoPlayer PRO would like access to your media library to automatically show videos downloaded to your device.
             </Text>
           </View>
 
@@ -102,7 +97,7 @@ export function PermissionsGate({ children }: Props) {
             onPress={handleAllow}
             style={({ pressed }) => [styles.allowBtn, pressed && { opacity: 0.85 }]}
           >
-            <Text style={styles.allowBtnText}>Allow Access &amp; Continue</Text>
+            <Text style={styles.allowBtnText}>Allow Access & Continue</Text>
           </Pressable>
 
           <Pressable onPress={handleSkip} style={styles.skipBtn}>
