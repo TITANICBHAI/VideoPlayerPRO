@@ -16,7 +16,9 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "UIRequiresFullScreen": false
+        "UIRequiresFullScreen": false,
+        "NSPhotoLibraryUsageDescription": "VideoPlayer PRO can access your media library to let you save and share videos.",
+        "NSPhotoLibraryAddUsageDescription": "VideoPlayer PRO can save videos to your photo library."
       }
     },
     "android": {
@@ -36,7 +38,8 @@
       "expo-font",
       "expo-web-browser",
       "expo-screen-orientation",
-      "expo-video"
+      "expo-video",
+      "expo-media-library"
     ],
     "experiments": {
       "typedRoutes": true,

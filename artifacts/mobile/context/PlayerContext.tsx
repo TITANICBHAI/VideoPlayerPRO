@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as MediaLibrary from "expo-media-library";
 import React, {
   createContext,
   useCallback,
@@ -16,11 +17,19 @@ export type VideoItem = {
   duration?: number;
   addedAt: number;
   chapters?: Chapter[];
+  isDeviceVideo?: boolean;
 };
 
 export type Chapter = {
   title: string;
   startTime: number;
+};
+
+export type WatchProgress = {
+  position: number;
+  duration: number;
+  lastWatched: number;
+  completed: boolean;
 };
 
 export type PlaybackSpeed = 0.25 | 0.5 | 0.75 | 1 | 1.25 | 1.5 | 1.75 | 2 | 2.5 | 3 | 4;
@@ -64,11 +73,15 @@ export type PlayerState = {
   backgroundPlayback: boolean;
   sleepTimerMinutes: number | null;
   sleepTimerRemaining: number | null;
+  resumePosition: number;
 };
 
 type PlayerContextType = {
   state: PlayerState;
   videos: VideoItem[];
+  deviceVideos: VideoItem[];
+  watchProgress: Record<string, WatchProgress>;
+  refreshDeviceVideos: () => Promise<void>;
   addVideo: (video: VideoItem) => void;
   removeVideo: (id: string) => void;
   playVideo: (video: VideoItem) => void;
@@ -96,12 +109,14 @@ type PlayerContextType = {
   toggleBackgroundPlayback: () => void;
   setSleepTimer: (minutes: number | null) => void;
   updatePlaybackInfo: (info: Partial<PlayerState>) => void;
+  saveWatchProgress: (videoId: string, position: number, duration: number) => void;
   resetPlayer: () => void;
 };
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
 
 const STORAGE_KEY = "@videoplayer_videos";
+const PROGRESS_KEY = "@videoplayer_progress";
 
 const DEFAULT_AUDIO_TRACKS: AudioTrack[] = [
   { id: "1", label: "English", language: "en" },
@@ -152,82 +167,36 @@ const DEFAULT_STATE: PlayerState = {
   backgroundPlayback: false,
   sleepTimerMinutes: null,
   sleepTimerRemaining: null,
+  resumePosition: 0,
 };
 
-const SAMPLE_VIDEOS: VideoItem[] = [
-  {
-    id: "1",
-    title: "Big Buck Bunny",
-    uri: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    duration: 596,
-    addedAt: Date.now() - 86400000,
-    chapters: [
-      { title: "Intro", startTime: 0 },
-      { title: "The Characters", startTime: 60 },
-      { title: "Main Adventure", startTime: 180 },
-      { title: "Climax", startTime: 420 },
-      { title: "Ending", startTime: 540 },
-    ],
-  },
-  {
-    id: "2",
-    title: "Elephant Dream",
-    uri: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    duration: 653,
-    addedAt: Date.now() - 172800000,
-    chapters: [
-      { title: "Opening", startTime: 0 },
-      { title: "The Machine", startTime: 120 },
-      { title: "Confrontation", startTime: 300 },
-      { title: "Resolution", startTime: 500 },
-    ],
-  },
-  {
-    id: "3",
-    title: "For Bigger Blazes",
-    uri: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    duration: 15,
-    addedAt: Date.now() - 259200000,
-  },
-  {
-    id: "4",
-    title: "Subaru Outback",
-    uri: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4",
-    duration: 60,
-    addedAt: Date.now() - 345600000,
-  },
-  {
-    id: "5",
-    title: "Tears of Steel",
-    uri: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-    duration: 734,
-    addedAt: Date.now() - 432000000,
-    chapters: [
-      { title: "Act I", startTime: 0 },
-      { title: "Act II", startTime: 200 },
-      { title: "Act III", startTime: 500 },
-      { title: "Finale", startTime: 680 },
-    ],
-  },
-  {
-    id: "6",
-    title: "Volkswagen GTI Review",
-    uri: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4",
-    duration: 50,
-    addedAt: Date.now() - 518400000,
-  },
-];
+const SAMPLE_VIDEOS: VideoItem[] = [];
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<PlayerState>(DEFAULT_STATE);
   const [videos, setVideos] = useState<VideoItem[]>(SAMPLE_VIDEOS);
+  const [deviceVideos, setDeviceVideos] = useState<VideoItem[]>([]);
+  const [watchProgress, setWatchProgress] = useState<Record<string, WatchProgress>>({});
+  const watchProgressRef = useRef<Record<string, WatchProgress>>({});
   const sleepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     loadVideos();
+    loadWatchProgress();
+    refreshDeviceVideos();
   }, []);
 
-  // Sleep timer countdown
+  useEffect(() => {
+    const subscription = MediaLibrary.addChangeListener(() => {
+      refreshDeviceVideos();
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    watchProgressRef.current = watchProgress;
+  }, [watchProgress]);
+
   useEffect(() => {
     if (state.sleepTimerRemaining === null) {
       if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
@@ -264,12 +233,62 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
+  const loadWatchProgress = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(PROGRESS_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as Record<string, WatchProgress>;
+        setWatchProgress(saved);
+        watchProgressRef.current = saved;
+      }
+    } catch {}
+  };
+
+  const refreshDeviceVideos = async () => {
+    try {
+      const permission = await MediaLibrary.getPermissionsAsync();
+      if (!permission.granted) return;
+      const result = await MediaLibrary.getAssetsAsync({
+        mediaType: MediaLibrary.MediaType.video,
+        sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+        first: 200,
+      });
+      const items: VideoItem[] = result.assets.map((asset) => ({
+        id: `device-${asset.id}`,
+        title: asset.filename.replace(/\.[^/.]+$/, ""),
+        uri: asset.uri,
+        thumbnail: asset.uri,
+        duration: asset.duration,
+        addedAt: asset.creationTime,
+        isDeviceVideo: true,
+      }));
+      setDeviceVideos(items);
+    } catch {}
+  };
+
   const saveVideos = async (list: VideoItem[]) => {
     try {
       const userAdded = list.filter((v) => !SAMPLE_VIDEOS.find((s) => s.id === v.id));
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(userAdded));
     } catch {}
   };
+
+  const saveWatchProgress = useCallback((videoId: string, position: number, duration: number) => {
+    if (!videoId || duration <= 0) return;
+    const completed = position >= duration * 0.95;
+    const entry: WatchProgress = {
+      position,
+      duration,
+      lastWatched: Date.now(),
+      completed,
+    };
+    setWatchProgress((prev) => {
+      const next = { ...prev, [videoId]: entry };
+      watchProgressRef.current = next;
+      AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
 
   const addVideo = useCallback((video: VideoItem) => {
     setVideos((prev) => {
@@ -288,15 +307,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const playVideo = useCallback((video: VideoItem) => {
+    const saved = watchProgressRef.current[video.id];
+    const resumePosition =
+      saved && !saved.completed && saved.position > 5
+        ? saved.position
+        : 0;
     setState((prev) => ({
       ...prev,
       currentVideo: video,
       isPlaying: true,
-      currentTime: 0,
+      currentTime: resumePosition,
       duration: video.duration ?? 0,
       isLoading: true,
       showControls: true,
       showSettings: false,
+      resumePosition,
     }));
   }, []);
 
@@ -336,7 +361,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <PlayerContext.Provider value={{
-      state, videos,
+      state, videos, deviceVideos, watchProgress,
+      refreshDeviceVideos,
       addVideo, removeVideo, playVideo,
       togglePlay, toggleMute, setVolume, setBrightness,
       setPlaybackRate, setQuality, setFitMode,
@@ -346,7 +372,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       toggleAmbientMode, toggleTheaterMode, toggleLock,
       setLoopMode, setAudioTrack, setSubtitleTrack,
       toggleAudioNormalization, toggleBackgroundPlayback,
-      setSleepTimer, updatePlaybackInfo, resetPlayer,
+      setSleepTimer, updatePlaybackInfo, saveWatchProgress, resetPlayer,
     }}>
       {children}
     </PlayerContext.Provider>

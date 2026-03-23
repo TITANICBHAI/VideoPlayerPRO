@@ -25,6 +25,7 @@ import { StatsOverlay } from "./StatsOverlay";
 
 const C = Colors.dark;
 const { width: SCREEN_W } = Dimensions.get("window");
+const PROGRESS_SAVE_INTERVAL = 5000;
 
 export function VideoPlayer() {
   const {
@@ -33,6 +34,7 @@ export function VideoPlayer() {
     setFullscreen,
     seekTo,
     setShowControls,
+    saveWatchProgress,
   } = usePlayer();
 
   const [seekLeft, setSeekLeft] = useState(false);
@@ -40,6 +42,10 @@ export function VideoPlayer() {
   const seekLeftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekRightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ambientOpacity = useSharedValue(0);
+  const progressSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const currentTimeRef = useRef(0);
+  const durationRef = useRef(0);
+  const hasResumed = useRef(false);
 
   const player = useVideoPlayer(state.currentVideo?.uri ?? null, (p) => {
     p.muted = state.isMuted;
@@ -72,9 +78,19 @@ export function VideoPlayer() {
 
   useEffect(() => {
     if (!player || !state.currentVideo) return;
+    hasResumed.current = false;
     try {
       player.replace(state.currentVideo.uri);
-      setTimeout(() => { try { player.play(); } catch {} }, 100);
+      const startAt = state.resumePosition;
+      setTimeout(() => {
+        try {
+          if (startAt > 5 && !hasResumed.current) {
+            player.currentTime = startAt;
+            hasResumed.current = true;
+          }
+          player.play();
+        } catch {}
+      }, 300);
     } catch {}
   }, [state.currentVideo?.id]);
 
@@ -84,9 +100,9 @@ export function VideoPlayer() {
       try {
         const ct = player.currentTime ?? 0;
         const dur = player.duration ?? 0;
-        // Simulated buffer health (in a real app, use player buffer events)
+        currentTimeRef.current = ct;
+        durationRef.current = dur > 0 ? dur : durationRef.current;
         const bufferHealth = Math.min(dur, ct + Math.random() * 30 + 10);
-        const bufferMB = (Math.random() * 8 + 2).toFixed(1);
         updatePlaybackInfo({
           currentTime: ct,
           duration: dur > 0 ? dur : state.duration,
@@ -101,6 +117,26 @@ export function VideoPlayer() {
     }, 500);
     return () => clearInterval(interval);
   }, [player, state.duration, state.audioNormalization]);
+
+  useEffect(() => {
+    if (!state.currentVideo) return;
+    const videoId = state.currentVideo.id;
+    progressSaveTimer.current = setInterval(() => {
+      const pos = currentTimeRef.current;
+      const dur = durationRef.current;
+      if (pos > 0 && dur > 0) {
+        saveWatchProgress(videoId, pos, dur);
+      }
+    }, PROGRESS_SAVE_INTERVAL);
+    return () => {
+      if (progressSaveTimer.current) clearInterval(progressSaveTimer.current);
+      const pos = currentTimeRef.current;
+      const dur = durationRef.current;
+      if (videoId && pos > 0 && dur > 0) {
+        saveWatchProgress(videoId, pos, dur);
+      }
+    };
+  }, [state.currentVideo?.id, saveWatchProgress]);
 
   useEffect(() => {
     ambientOpacity.value = withTiming(state.ambientMode ? 0.7 : 0, { duration: 1000 });
@@ -201,11 +237,11 @@ export function VideoPlayer() {
         style={StyleSheet.absoluteFill}
         contentFit={contentFit}
         nativeControls={false}
+        allowsPictureInPicture={Platform.OS !== "web"}
+        startsPictureInPictureAutomatically={false}
       />
 
-      {/* Gesture overlay: swipe up/down fullscreen + brightness/volume swipe */}
       <GestureOverlay onSeekRelative={handleSeekRelative}>
-        {/* Double-tap zones inside gesture overlay */}
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <GestureDetector gesture={doubleTapLeft}>
             <View style={styles.leftZone} />
@@ -216,7 +252,6 @@ export function VideoPlayer() {
         </View>
       </GestureOverlay>
 
-      {/* Controls layer */}
       <Controls onSeek={handleSeek} onSeekRelative={handleSeekRelative} />
 
       <SeekIndicator direction="left" seconds={10} visible={seekLeft} />

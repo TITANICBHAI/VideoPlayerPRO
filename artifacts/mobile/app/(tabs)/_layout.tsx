@@ -3,9 +3,9 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 
 import Colors from "@/constants/colors";
 
@@ -17,6 +17,10 @@ function NativeTabLayout() {
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "play.rectangle", selected: "play.rectangle.fill" }} />
         <Label>Library</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="settings">
+        <Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} />
+        <Label>Settings</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -61,6 +65,18 @@ function ClassicTabLayout() {
               <SymbolView name="play.rectangle" tintColor={color} size={24} />
             ) : (
               <Ionicons name="library-outline" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="gearshape" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="settings-outline" size={22} color={color} />
             ),
         }}
       />

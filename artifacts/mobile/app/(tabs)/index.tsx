@@ -1,11 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
+  AppStateStatus,
   FlatList,
   Platform,
   Pressable,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -20,18 +24,82 @@ import { usePlayer } from "@/context/PlayerContext";
 
 const C = Colors.dark;
 
+type SortOption = "recent" | "oldest" | "az" | "za" | "longest" | "last-watched";
+
+const SORT_OPTIONS: { key: SortOption; label: string; icon: string }[] = [
+  { key: "recent", label: "Recent", icon: "time-outline" },
+  { key: "oldest", label: "Oldest", icon: "calendar-outline" },
+  { key: "az", label: "A–Z", icon: "text-outline" },
+  { key: "za", label: "Z–A", icon: "text-outline" },
+  { key: "longest", label: "Longest", icon: "film-outline" },
+  { key: "last-watched", label: "Last Watched", icon: "eye-outline" },
+];
+
 export default function HomeScreen() {
-  const { videos, playVideo, removeVideo, state } = usePlayer();
+  const { videos, deviceVideos, playVideo, removeVideo, state, watchProgress, refreshDeviceVideos } = usePlayer();
   const insets = useSafeAreaInsets();
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("recent");
+  const [refreshing, setRefreshing] = useState(false);
+  const appState = useRef(AppState.currentState);
 
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : 0;
 
-  const filtered = searchQuery.trim()
-    ? videos.filter((v) => v.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    : videos;
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextState === "active") {
+        refreshDeviceVideos();
+      }
+      appState.current = nextState;
+    });
+    return () => sub.remove();
+  }, [refreshDeviceVideos]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshDeviceVideos();
+    setRefreshing(false);
+  }, [refreshDeviceVideos]);
+
+  const allVideos = useMemo(() => {
+    const urlVideoIds = new Set(videos.map((v) => v.id));
+    const filteredDevice = deviceVideos.filter((d) => !urlVideoIds.has(d.id));
+    return [...videos, ...filteredDevice];
+  }, [videos, deviceVideos]);
+
+  const sorted = useMemo(() => {
+    const filtered = searchQuery.trim()
+      ? allVideos.filter((v) => v.title.toLowerCase().includes(searchQuery.toLowerCase()))
+      : [...allVideos];
+
+    switch (sortBy) {
+      case "recent":
+        return filtered.sort((a, b) => b.addedAt - a.addedAt);
+      case "oldest":
+        return filtered.sort((a, b) => a.addedAt - b.addedAt);
+      case "az":
+        return filtered.sort((a, b) => a.title.localeCompare(b.title));
+      case "za":
+        return filtered.sort((a, b) => b.title.localeCompare(a.title));
+      case "longest":
+        return filtered.sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0));
+      case "last-watched":
+        return filtered.sort((a, b) => {
+          const pa = watchProgress[a.id]?.lastWatched ?? 0;
+          const pb = watchProgress[b.id]?.lastWatched ?? 0;
+          return pb - pa;
+        });
+      default:
+        return filtered;
+    }
+  }, [allVideos, searchQuery, sortBy, watchProgress]);
+
+  const watchedCount = useMemo(
+    () => Object.values(watchProgress).filter((p) => p.completed).length,
+    [watchProgress]
+  );
 
   const handlePlay = (video: typeof videos[0]) => {
     playVideo(video);
@@ -82,6 +150,18 @@ export default function HomeScreen() {
             <Ionicons name="library-outline" size={12} color={C.accent} />
             <Text style={styles.statText}>{videos.length} videos</Text>
           </View>
+          {deviceVideos.length > 0 && (
+            <View style={styles.statChip}>
+              <Ionicons name="phone-portrait-outline" size={12} color="#64B5F6" />
+              <Text style={[styles.statText, { color: "#64B5F6" }]}>{deviceVideos.length} on device</Text>
+            </View>
+          )}
+          {watchedCount > 0 && (
+            <View style={styles.statChip}>
+              <Ionicons name="checkmark-circle-outline" size={12} color="#4CAF50" />
+              <Text style={[styles.statText, { color: "#4CAF50" }]}>{watchedCount} watched</Text>
+            </View>
+          )}
           {state.currentVideo && (
             <Pressable
               onPress={() => router.push("/player")}
@@ -95,14 +175,49 @@ export default function HomeScreen() {
             </Pressable>
           )}
         </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sortRow}
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.key}
+              onPress={() => {
+                setSortBy(opt.key);
+                Haptics.selectionAsync();
+              }}
+              style={[styles.sortChip, sortBy === opt.key && styles.sortChipActive]}
+            >
+              <Ionicons
+                name={opt.icon as any}
+                size={11}
+                color={sortBy === opt.key ? C.accent : C.textMuted}
+              />
+              <Text style={[styles.sortChipText, sortBy === opt.key && styles.sortChipTextActive]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
       </View>
 
       <FlatList
-        data={filtered}
+        data={sorted}
         keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={C.accent}
+            colors={[C.accent]}
+          />
+        }
         renderItem={({ item }) => (
           <VideoCard
             video={item}
+            progress={watchProgress[item.id]}
             onPress={() => handlePlay(item)}
             onDelete={() => removeVideo(item.id)}
             isActive={state.currentVideo?.id === item.id}
@@ -121,7 +236,7 @@ export default function HomeScreen() {
         }
         contentContainerStyle={[
           styles.list,
-          filtered.length === 0 && styles.listEmpty,
+          sorted.length === 0 && styles.listEmpty,
           { paddingBottom: bottomPad + 100 },
         ]}
         showsVerticalScrollIndicator={false}
@@ -140,10 +255,10 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
-    gap: 12,
+    gap: 10,
     paddingTop: 4,
   },
   headerTop: {
@@ -214,6 +329,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flexWrap: "wrap",
   },
   statChip: {
     flexDirection: "row",
@@ -253,6 +369,34 @@ const styles = StyleSheet.create({
     flex: 1,
     color: C.accent,
     fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
+  sortRow: {
+    gap: 6,
+    paddingRight: 4,
+  },
+  sortChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: C.surfaceElevated,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  sortChipActive: {
+    backgroundColor: C.accentSoft,
+    borderColor: C.accent,
+  },
+  sortChipText: {
+    color: C.textMuted,
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+  },
+  sortChipTextActive: {
+    color: C.accent,
     fontFamily: "Inter_600SemiBold",
   },
   list: {

@@ -14,6 +14,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PermissionsGate } from "@/components/PermissionsGate";
 import { PlayerProvider } from "@/context/PlayerContext";
 
 SplashScreen.preventAutoHideAsync();
@@ -30,6 +31,14 @@ function RootLayoutNav() {
           headerShown: false,
           presentation: "card",
           animation: "slide_from_bottom",
+        }}
+      />
+      <Stack.Screen
+        name="privacy-policy"
+        options={{
+          headerShown: false,
+          presentation: "card",
+          animation: "slide_from_right",
         }}
       />
       <Stack.Screen name="+not-found" />
@@ -60,7 +69,9 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <PlayerProvider>
-                <RootLayoutNav />
+                <PermissionsGate>
+                  <RootLayoutNav />
+                </PermissionsGate>
               </PlayerProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
