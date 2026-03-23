@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "48TTTcsJZU3GJyzVA-s6p"
+uri = "file://VideoPlayerPRO_App_Overview.md"
+type = "text"
+title = "VideoPlayer PRO — Complete App Overview & APK Guide"
