@@ -6,3 +6,15 @@ id = "48TTTcsJZU3GJyzVA-s6p"
 uri = "file://VideoPlayerPRO_App_Overview.md"
 type = "text"
 title = "VideoPlayer PRO — Complete App Overview & APK Guide"
+
+[[outputs]]
+id = "95XCcydhmn9iKnZ01Vc40"
+uri = "file://attached_assets/feature-graphic.png"
+type = "image"
+title = "Feature Graphic (1024×576)"
+
+[[outputs]]
+id = "PDXoCOWWG-2adNh_nJIgj"
+uri = "file://artifacts/mobile/assets/images/icon.png"
+type = "image"
+title = "App Icon"
