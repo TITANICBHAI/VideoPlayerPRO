@@ -117,6 +117,7 @@ const PlayerContext = createContext<PlayerContextType | null>(null);
 
 const STORAGE_KEY = "@videoplayer_videos";
 const PROGRESS_KEY = "@videoplayer_progress";
+const HIDDEN_KEY = "@videoplayer_hidden_device";
 
 const DEFAULT_AUDIO_TRACKS: AudioTrack[] = [
   { id: "1", label: "English", language: "en" },
@@ -176,6 +177,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<PlayerState>(DEFAULT_STATE);
   const [videos, setVideos] = useState<VideoItem[]>(SAMPLE_VIDEOS);
   const [deviceVideos, setDeviceVideos] = useState<VideoItem[]>([]);
+  const [hiddenDeviceIds, setHiddenDeviceIds] = useState<Set<string>>(new Set());
   const [watchProgress, setWatchProgress] = useState<Record<string, WatchProgress>>({});
   const watchProgressRef = useRef<Record<string, WatchProgress>>({});
   const sleepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -183,6 +185,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadVideos();
     loadWatchProgress();
+    loadHiddenDeviceIds();
     refreshDeviceVideos();
   }, []);
 
@@ -241,6 +244,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setWatchProgress(saved);
         watchProgressRef.current = saved;
       }
+    } catch {}
+  };
+
+  const loadHiddenDeviceIds = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(HIDDEN_KEY);
+      if (raw) {
+        setHiddenDeviceIds(new Set(JSON.parse(raw) as string[]));
+      }
+    } catch {}
+  };
+
+  const saveHiddenDeviceIds = async (ids: Set<string>) => {
+    try {
+      await AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...ids]));
     } catch {}
   };
 
@@ -312,11 +330,23 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const removeVideo = useCallback((id: string) => {
-    setVideos((prev) => {
-      const next = prev.filter((v) => v.id !== id);
-      saveVideos(next);
-      return next;
-    });
+    if (id.startsWith("device-")) {
+      const assetId = id.replace("device-", "");
+      MediaLibrary.deleteAssetsAsync([assetId]).catch(() => {});
+      setDeviceVideos((prev) => prev.filter((v) => v.id !== id));
+      setHiddenDeviceIds((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        saveHiddenDeviceIds(next);
+        return next;
+      });
+    } else {
+      setVideos((prev) => {
+        const next = prev.filter((v) => v.id !== id);
+        saveVideos(next);
+        return next;
+      });
+    }
   }, []);
 
   const playVideo = useCallback((video: VideoItem) => {
@@ -372,9 +402,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const updatePlaybackInfo = useCallback((info: Partial<PlayerState>) => setState((p) => ({ ...p, ...info })), []);
   const resetPlayer = useCallback(() => setState(DEFAULT_STATE), []);
 
+  const visibleDeviceVideos = deviceVideos.filter((v) => !hiddenDeviceIds.has(v.id));
+
   return (
     <PlayerContext.Provider value={{
-      state, videos, deviceVideos, watchProgress,
+      state, videos, deviceVideos: visibleDeviceVideos, watchProgress,
       refreshDeviceVideos,
       addVideo, removeVideo, playVideo,
       togglePlay, toggleMute, setVolume, setBrightness,

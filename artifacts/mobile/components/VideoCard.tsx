@@ -3,7 +3,9 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import React, { useRef } from "react";
 import {
+  Alert,
   Animated,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -25,13 +27,32 @@ type Props = {
   isActive: boolean;
 };
 
+function confirmDelete(title: string, onDelete: () => void) {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  Alert.alert(
+    "Delete Video",
+    `Remove "${title}" from your library?${"\n"}${
+      title ? "" : ""
+    }`,
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          onDelete();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        },
+      },
+    ],
+    { cancelable: true }
+  );
+}
+
 function renderRightActions(onDelete: () => void) {
   return (
     <Pressable
-      onPress={() => {
-        onDelete();
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      }}
+      onPress={onDelete}
       style={styles.swipeDeleteBtn}
     >
       <Ionicons name="trash-outline" size={20} color="#fff" />
@@ -52,6 +73,19 @@ export function VideoCard({ video, progress, onPress, onDelete, isActive }: Prop
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20 }).start();
   };
 
+  const handleLongPress = () => {
+    confirmDelete(video.title, onDelete);
+  };
+
+  const handleMenuPress = () => {
+    confirmDelete(video.title, onDelete);
+  };
+
+  const handleSwipeDelete = () => {
+    swipeableRef.current?.close();
+    confirmDelete(video.title, onDelete);
+  };
+
   const progressPercent =
     progress && progress.duration > 0
       ? Math.min(1, progress.position / progress.duration)
@@ -62,10 +96,7 @@ export function VideoCard({ video, progress, onPress, onDelete, isActive }: Prop
   return (
     <Swipeable
       ref={swipeableRef}
-      renderRightActions={() => renderRightActions(() => {
-        swipeableRef.current?.close();
-        onDelete();
-      })}
+      renderRightActions={() => renderRightActions(handleSwipeDelete)}
       overshootRight={false}
       friction={2}
       rightThreshold={60}
@@ -73,8 +104,10 @@ export function VideoCard({ video, progress, onPress, onDelete, isActive }: Prop
       <Animated.View style={[styles.wrapper, { transform: [{ scale }] }]}>
         <Pressable
           onPress={onPress}
+          onLongPress={handleLongPress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
+          delayLongPress={450}
           style={[styles.card, isActive && styles.cardActive]}
         >
           <View style={styles.thumbnail}>
@@ -147,9 +180,13 @@ export function VideoCard({ video, progress, onPress, onDelete, isActive }: Prop
             </View>
           </View>
 
-          <View style={styles.chevron}>
-            <Ionicons name="chevron-forward" size={16} color={C.textMuted} />
-          </View>
+          <Pressable
+            onPress={handleMenuPress}
+            hitSlop={8}
+            style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.5 }]}
+          >
+            <Ionicons name="ellipsis-vertical" size={16} color={C.textMuted} />
+          </Pressable>
         </Pressable>
       </Animated.View>
     </Swipeable>
@@ -293,8 +330,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: "Inter_400Regular",
   },
-  chevron: {
-    paddingLeft: 4,
+  menuBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   swipeDeleteBtn: {
     width: 80,
