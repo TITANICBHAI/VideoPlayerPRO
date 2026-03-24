@@ -24,7 +24,7 @@ import { usePlayer } from "@/context/PlayerContext";
 
 const C = Colors.dark;
 
-type SortOption = "recent" | "oldest" | "az" | "za" | "longest" | "last-watched";
+type SortOption = "recent" | "oldest" | "az" | "za" | "longest" | "shortest" | "last-watched";
 
 const SORT_OPTIONS: { key: SortOption; label: string; icon: string }[] = [
   { key: "recent", label: "Recent", icon: "time-outline" },
@@ -32,6 +32,7 @@ const SORT_OPTIONS: { key: SortOption; label: string; icon: string }[] = [
   { key: "az", label: "A–Z", icon: "text-outline" },
   { key: "za", label: "Z–A", icon: "text-outline" },
   { key: "longest", label: "Longest", icon: "film-outline" },
+  { key: "shortest", label: "Shortest", icon: "timer-outline" },
   { key: "last-watched", label: "Last Watched", icon: "eye-outline" },
 ];
 
@@ -74,25 +75,28 @@ export default function HomeScreen() {
       ? allVideos.filter((v) => v.title.toLowerCase().includes(searchQuery.toLowerCase()))
       : [...allVideos];
 
+    const copy = [...filtered];
     switch (sortBy) {
       case "recent":
-        return filtered.sort((a, b) => b.addedAt - a.addedAt);
+        return copy.sort((a, b) => b.addedAt - a.addedAt);
       case "oldest":
-        return filtered.sort((a, b) => a.addedAt - b.addedAt);
+        return copy.sort((a, b) => a.addedAt - b.addedAt);
       case "az":
-        return filtered.sort((a, b) => a.title.localeCompare(b.title));
+        return copy.sort((a, b) => a.title.localeCompare(b.title));
       case "za":
-        return filtered.sort((a, b) => b.title.localeCompare(a.title));
+        return copy.sort((a, b) => b.title.localeCompare(a.title));
       case "longest":
-        return filtered.sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0));
+        return copy.sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0));
+      case "shortest":
+        return copy.sort((a, b) => (a.duration ?? Infinity) - (b.duration ?? Infinity));
       case "last-watched":
-        return filtered.sort((a, b) => {
+        return copy.sort((a, b) => {
           const pa = watchProgress[a.id]?.lastWatched ?? 0;
           const pb = watchProgress[b.id]?.lastWatched ?? 0;
           return pb - pa;
         });
       default:
-        return filtered;
+        return copy;
     }
   }, [allVideos, searchQuery, sortBy, watchProgress]);
 

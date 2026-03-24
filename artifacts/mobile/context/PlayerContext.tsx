@@ -191,7 +191,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       refreshDeviceVideos();
     });
     return () => subscription.remove();
-  }, []);
+  }, [refreshDeviceVideos]);
 
   useEffect(() => {
     watchProgressRef.current = watchProgress;
@@ -244,16 +244,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
-  const refreshDeviceVideos = async () => {
+  const refreshDeviceVideos = useCallback(async () => {
     try {
       const permission = await MediaLibrary.getPermissionsAsync();
       if (!permission.granted) return;
-      const result = await MediaLibrary.getAssetsAsync({
-        mediaType: MediaLibrary.MediaType.video,
-        sortBy: [[MediaLibrary.SortBy.creationTime, false]],
-        first: 200,
-      });
-      const items: VideoItem[] = result.assets.map((asset) => ({
+
+      const allAssets: MediaLibrary.Asset[] = [];
+      let after: string | undefined;
+      let hasNextPage = true;
+
+      while (hasNextPage) {
+        const result = await MediaLibrary.getAssetsAsync({
+          mediaType: MediaLibrary.MediaType.video,
+          sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+          first: 200,
+          after,
+        });
+        allAssets.push(...result.assets);
+        hasNextPage = result.hasNextPage;
+        after = result.endCursor;
+        if (allAssets.length >= 1000) break;
+      }
+
+      const items: VideoItem[] = allAssets.map((asset) => ({
         id: `device-${asset.id}`,
         title: asset.filename.replace(/\.[^/.]+$/, ""),
         uri: asset.uri,
@@ -264,7 +277,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }));
       setDeviceVideos(items);
     } catch {}
-  };
+  }, []);
 
   const saveVideos = async (list: VideoItem[]) => {
     try {

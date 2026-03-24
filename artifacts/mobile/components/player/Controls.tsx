@@ -35,9 +35,10 @@ const HIDE_DELAY = 3500;
 type Props = {
   onSeek: (t: number) => void;
   onSeekRelative: (delta: number) => void;
+  onEnterPiP?: () => void;
 };
 
-export function Controls({ onSeek, onSeekRelative }: Props) {
+export function Controls({ onSeek, onSeekRelative, onEnterPiP }: Props) {
   const {
     state,
     togglePlay,
@@ -198,6 +199,11 @@ export function Controls({ onSeek, onSeekRelative }: Props) {
                 <PillButton onPress={() => { toggleSettings(); resetHideTimer(); }}>
                   <Ionicons name="settings-outline" size={14} color={C.text} />
                 </PillButton>
+                {Platform.OS !== "web" && onEnterPiP && (
+                  <PillButton onPress={() => { onEnterPiP(); resetHideTimer(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}>
+                    <MaterialCommunityIcons name="picture-in-picture-bottom-right" size={14} color={C.text} />
+                  </PillButton>
+                )}
                 <PillButton onPress={() => { setFullscreen(!state.isFullscreen); resetHideTimer(); }}>
                   <Ionicons
                     name={state.isFullscreen ? "contract-outline" : "expand-outline"}

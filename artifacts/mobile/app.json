@@ -23,7 +23,13 @@
     },
     "android": {
       "softwareKeyboardLayoutMode": "pan",
-      "package": "com.videoplayer.app"
+      "package": "com.videoplayer.app",
+      "permissions": [
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -38,8 +44,15 @@
       "expo-font",
       "expo-web-browser",
       "expo-screen-orientation",
-      "expo-video",
-      "expo-media-library"
+      ["expo-video", {
+        "supportsBackgroundPlayback": true,
+        "supportsPictureInPicture": true
+      }],
+      ["expo-media-library", {
+        "photosPermission": "VideoPlayer PRO uses your media library to discover videos saved on your device.",
+        "savePhotosPermission": "Allow VideoPlayer PRO to save videos to your library.",
+        "isAccessMediaLocationEnabled": true
+      }]
     ],
     "experiments": {
       "typedRoutes": true,

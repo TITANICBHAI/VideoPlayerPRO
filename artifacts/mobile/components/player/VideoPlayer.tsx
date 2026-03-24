@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import * as ScreenOrientation from "expo-screen-orientation";
-import { useVideoPlayer, VideoView } from "expo-video";
+import { useVideoPlayer, VideoView, type VideoViewRef } from "expo-video";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dimensions,
@@ -46,6 +46,7 @@ export function VideoPlayer() {
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
   const hasResumed = useRef(false);
+  const videoViewRef = useRef<VideoViewRef>(null);
 
   const player = useVideoPlayer(state.currentVideo?.uri ?? null, (p) => {
     p.muted = state.isMuted;
@@ -142,6 +143,12 @@ export function VideoPlayer() {
     ambientOpacity.value = withTiming(state.ambientMode ? 0.7 : 0, { duration: 1000 });
   }, [state.ambientMode]);
 
+  const handleEnterPiP = useCallback(() => {
+    try {
+      videoViewRef.current?.startPictureInPicture();
+    } catch {}
+  }, []);
+
   const handleFullscreen = useCallback(async (fullscreen: boolean) => {
     setFullscreen(fullscreen);
     if (Platform.OS !== "web") {
@@ -233,12 +240,13 @@ export function VideoPlayer() {
       )}
 
       <VideoView
+        ref={videoViewRef}
         player={player}
         style={StyleSheet.absoluteFill}
         contentFit={contentFit}
         nativeControls={false}
         allowsPictureInPicture={Platform.OS !== "web"}
-        startsPictureInPictureAutomatically={false}
+        startsPictureInPictureAutomatically={Platform.OS !== "web"}
       />
 
       <GestureOverlay onSeekRelative={handleSeekRelative}>
@@ -252,7 +260,7 @@ export function VideoPlayer() {
         </View>
       </GestureOverlay>
 
-      <Controls onSeek={handleSeek} onSeekRelative={handleSeekRelative} />
+      <Controls onSeek={handleSeek} onSeekRelative={handleSeekRelative} onEnterPiP={handleEnterPiP} />
 
       <SeekIndicator direction="left" seconds={10} visible={seekLeft} />
       <SeekIndicator direction="right" seconds={10} visible={seekRight} />
