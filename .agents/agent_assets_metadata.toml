@@ -18,3 +18,9 @@ id = "PDXoCOWWG-2adNh_nJIgj"
 uri = "file://artifacts/mobile/assets/images/icon.png"
 type = "image"
 title = "App Icon"
+
+[[outputs]]
+id = "qgvUjIHYzov5nBRD2Czfj"
+uri = "file://attached_assets/feature-graphic-1024x500.png"
+type = "image"
+title = "Feature Graphic (1024×500) — ready to upload"
