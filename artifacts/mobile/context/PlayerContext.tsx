@@ -334,8 +334,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const removeVideo = useCallback((id: string) => {
     if (id.startsWith("device-")) {
-      const assetId = id.replace("device-", "");
-      MediaLibrary.deleteAssetsAsync([assetId]).catch(() => {});
       setDeviceVideos((prev) => prev.filter((v) => v.id !== id));
       setHiddenDeviceIds((prev) => {
         const next = new Set(prev);

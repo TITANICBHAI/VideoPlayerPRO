@@ -16,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PermissionsGate } from "@/components/PermissionsGate";
+import { TutorialOverlay } from "@/components/TutorialOverlay";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 
@@ -102,6 +103,7 @@ export default function RootLayout() {
                 <PlayerProvider>
                   <PermissionsGate>
                     <RootLayoutNav />
+                    <TutorialOverlay />
                   </PermissionsGate>
                 </PlayerProvider>
               </KeyboardProvider>

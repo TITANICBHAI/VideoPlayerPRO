@@ -8,17 +8,16 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   BackHandler,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   FadeIn,
   FadeOut,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -36,9 +35,10 @@ type Props = {
   onSeek: (t: number) => void;
   onSeekRelative: (delta: number) => void;
   onEnterPiP?: () => void;
+  screenWidth: number;
 };
 
-export function Controls({ onSeek, onSeekRelative, onEnterPiP }: Props) {
+export function Controls({ onSeek, onSeekRelative, onEnterPiP, screenWidth }: Props) {
   const {
     state,
     togglePlay,
@@ -56,18 +56,23 @@ export function Controls({ onSeek, onSeekRelative, onEnterPiP }: Props) {
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevRate = useRef(state.playbackRate);
   const opacity = useSharedValue(1);
+  const showSettingsRef = useRef(state.showSettings);
+  const isLockedRef = useRef(state.isLocked);
+
+  useEffect(() => { showSettingsRef.current = state.showSettings; }, [state.showSettings]);
+  useEffect(() => { isLockedRef.current = state.isLocked; }, [state.isLocked]);
 
   const resetHideTimer = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
     opacity.value = withTiming(1, { duration: 150 });
     setShowControls(true);
     hideTimer.current = setTimeout(() => {
-      if (!state.showSettings && !state.isLocked) {
+      if (!showSettingsRef.current && !isLockedRef.current) {
         opacity.value = withTiming(0, { duration: 400 });
         setShowControls(false);
       }
     }, HIDE_DELAY);
-  }, [state.showSettings, state.isLocked]);
+  }, []);
 
   useEffect(() => {
     resetHideTimer();
@@ -93,16 +98,6 @@ export function Controls({ onSeek, onSeekRelative, onEnterPiP }: Props) {
     });
     return () => sub.remove();
   }, [state.isFullscreen]);
-
-  const handlePressArea = () => {
-    if (state.isLocked) return;
-    if (state.showControls) {
-      opacity.value = withTiming(0, { duration: 200 });
-      setShowControls(false);
-    } else {
-      resetHideTimer();
-    }
-  };
 
   const handlePressIn = () => {
     prevRate.current = state.playbackRate;
@@ -149,21 +144,54 @@ export function Controls({ onSeek, onSeekRelative, onEnterPiP }: Props) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
+  const singleTap = Gesture.Tap()
+    .maxDuration(250)
+    .runOnJS(true)
+    .onEnd(() => {
+      if (state.isLocked) return;
+      if (state.showControls) {
+        opacity.value = withTiming(0, { duration: 200 });
+        setShowControls(false);
+      } else {
+        resetHideTimer();
+      }
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .maxDuration(300)
+    .runOnJS(true)
+    .onEnd((e) => {
+      if (state.isLocked) return;
+      const isLeft = e.x < screenWidth / 2;
+      onSeekRelative(isLeft ? -10 : 10);
+      resetHideTimer();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    });
+
+  const longPress = Gesture.LongPress()
+    .minDuration(400)
+    .runOnJS(true)
+    .onBegin(handlePressIn)
+    .onFinalize(handlePressOut);
+
+  singleTap.requireExternalGestureToFail(doubleTap);
+
+  const composedGesture = Gesture.Simultaneous(
+    Gesture.Exclusive(doubleTap, singleTap),
+    longPress
+  );
+
   const topInset = state.isFullscreen ? insets.top : 0;
   const bottomInset = state.isFullscreen ? insets.bottom : 0;
   const loopActive = state.loopMode !== "none";
   const loopIcon = state.loopMode === "one" ? "repeat-once" : "repeat";
 
   return (
-    <Pressable
-      style={StyleSheet.absoluteFill}
-      onPress={handlePressArea}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-    >
+    <GestureDetector gesture={composedGesture}>
       <Animated.View style={[StyleSheet.absoluteFill, animStyle, styles.container]}>
         {state.isLocked ? (
-          <View style={[styles.lockOnly, { top: topInset + 12 }]}>
+          <View style={[StyleSheet.absoluteFill, styles.lockOnly, { paddingTop: topInset + 12 }]}>
             <PillButton
               onPress={() => {
                 toggleLock();
@@ -214,34 +242,29 @@ export function Controls({ onSeek, onSeekRelative, onEnterPiP }: Props) {
               </View>
             </View>
 
-            {/* CENTER CONTROLS */}
-            <View style={styles.centerRow}>
-              <PillButton onPress={handleBack10} style={styles.seekBtn}>
-                <MaterialIcons name="replay-10" size={26} color={C.text} />
-              </PillButton>
-              <PillButton onPress={handlePlay} style={styles.playBtn}>
-                <Ionicons
-                  name={state.isPlaying ? "pause" : "play"}
-                  size={32}
-                  color={C.text}
-                />
-              </PillButton>
-              <PillButton onPress={handleForward10} style={styles.seekBtn}>
-                <MaterialIcons name="forward-10" size={26} color={C.text} />
-              </PillButton>
+            {/* CENTER CONTROLS — absolutely centred */}
+            <View style={styles.centerArea} pointerEvents="box-none">
+              <View style={styles.centerRow}>
+                <PillButton onPress={handleBack10} style={styles.seekBtn}>
+                  <MaterialIcons name="replay-10" size={26} color={C.text} />
+                </PillButton>
+                <PillButton onPress={handlePlay} style={styles.playBtn}>
+                  <Ionicons
+                    name={state.isPlaying ? "pause" : "play"}
+                    size={32}
+                    color={C.text}
+                  />
+                </PillButton>
+                <PillButton onPress={handleForward10} style={styles.seekBtn}>
+                  <MaterialIcons name="forward-10" size={26} color={C.text} />
+                </PillButton>
+              </View>
+              <View style={styles.swipeHintRow} pointerEvents="none">
+                <Text style={styles.swipeHintText}>
+                  {state.isFullscreen ? "swipe down to exit" : "double-tap to seek · swipe up for fullscreen"}
+                </Text>
+              </View>
             </View>
-
-            {/* SWIPE HINT */}
-            {!state.isFullscreen && (
-              <View style={styles.swipeHintRow} pointerEvents="none">
-                <Text style={styles.swipeHintText}>swipe up for fullscreen</Text>
-              </View>
-            )}
-            {state.isFullscreen && (
-              <View style={styles.swipeHintRow} pointerEvents="none">
-                <Text style={styles.swipeHintText}>swipe down to exit</Text>
-              </View>
-            )}
 
             {/* BOTTOM BAR */}
             <View style={[styles.bottomBar, { paddingBottom: bottomInset + 8 }]}>
@@ -295,18 +318,17 @@ export function Controls({ onSeek, onSeekRelative, onEnterPiP }: Props) {
           </>
         )}
       </Animated.View>
-    </Pressable>
+    </GestureDetector>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    justifyContent: "space-between",
     backgroundColor: "rgba(0,0,0,0.35)",
   },
   lockOnly: {
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
   },
   lockText: {
     color: C.text,
@@ -314,6 +336,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   topBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
@@ -335,6 +361,16 @@ const styles = StyleSheet.create({
     gap: 5,
     flexShrink: 0,
     alignItems: "center",
+  },
+  centerArea: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
   },
   centerRow: {
     flexDirection: "row",
@@ -358,15 +394,18 @@ const styles = StyleSheet.create({
   },
   swipeHintRow: {
     alignItems: "center",
-    paddingBottom: 2,
   },
   swipeHintText: {
-    color: "rgba(255,255,255,0.25)",
+    color: "rgba(255,255,255,0.3)",
     fontSize: 9,
     fontFamily: "Inter_400Regular",
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
     gap: 8,
   },
   bottomControls: {

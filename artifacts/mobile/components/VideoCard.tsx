@@ -61,7 +61,7 @@ function renderRightActions(onDelete: () => void) {
   );
 }
 
-export function VideoCard({ video, progress, onPress, onDelete, isActive }: Props) {
+export const VideoCard = React.memo(function VideoCard({ video, progress, onPress, onDelete, isActive }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
   const swipeableRef = useRef<Swipeable>(null);
 
@@ -191,7 +191,7 @@ export function VideoCard({ video, progress, onPress, onDelete, isActive }: Prop
       </Animated.View>
     </Swipeable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrapper: {

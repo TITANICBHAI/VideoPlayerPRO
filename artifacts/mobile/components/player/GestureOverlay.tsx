@@ -55,10 +55,9 @@ function GestureIndicator({ type, value }: { type: GestureIndicatorType; value: 
 
 type Props = {
   onSeekRelative: (delta: number) => void;
-  children?: React.ReactNode;
 };
 
-export function GestureOverlay({ children }: Props) {
+export function GestureOverlay(_props: Props) {
   const { state, setVolume, setBrightness, setFullscreen } = usePlayer();
   const [gestureType, setGestureType] = useState<GestureIndicatorType>("none");
   const [gestureValue, setGestureValue] = useState(0);
@@ -117,7 +116,6 @@ export function GestureOverlay({ children }: Props) {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={StyleSheet.absoluteFill}>
-        {children}
         <GestureIndicator type={gestureType} value={gestureValue} />
       </View>
     </GestureDetector>

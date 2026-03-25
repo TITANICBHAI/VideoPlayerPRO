@@ -9,7 +9,6 @@ import {
   Platform,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -22,25 +21,12 @@ import { VideoCard } from "@/components/VideoCard";
 import { usePlayer } from "@/context/PlayerContext";
 import { useTheme } from "@/context/ThemeContext";
 
-type SortOption = "recent" | "oldest" | "az" | "za" | "longest" | "shortest" | "last-watched";
-
-const SORT_OPTIONS: { key: SortOption; label: string; icon: string }[] = [
-  { key: "recent", label: "Recent", icon: "time-outline" },
-  { key: "oldest", label: "Oldest", icon: "calendar-outline" },
-  { key: "az", label: "A–Z", icon: "text-outline" },
-  { key: "za", label: "Z–A", icon: "text-outline" },
-  { key: "longest", label: "Longest", icon: "film-outline" },
-  { key: "shortest", label: "Shortest", icon: "timer-outline" },
-  { key: "last-watched", label: "Last Watched", icon: "eye-outline" },
-];
-
 export default function HomeScreen() {
   const { videos, deviceVideos, playVideo, removeVideo, state, watchProgress, refreshDeviceVideos, pendingShareUrl } = usePlayer();
   const { C } = useTheme();
   const insets = useSafeAreaInsets();
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [refreshing, setRefreshing] = useState(false);
   const appState = useRef(AppState.currentState);
 
@@ -79,31 +65,8 @@ export default function HomeScreen() {
     const filtered = searchQuery.trim()
       ? allVideos.filter((v) => v.title.toLowerCase().includes(searchQuery.toLowerCase()))
       : [...allVideos];
-
-    const copy = [...filtered];
-    switch (sortBy) {
-      case "recent":
-        return copy.sort((a, b) => b.addedAt - a.addedAt);
-      case "oldest":
-        return copy.sort((a, b) => a.addedAt - b.addedAt);
-      case "az":
-        return copy.sort((a, b) => a.title.localeCompare(b.title));
-      case "za":
-        return copy.sort((a, b) => b.title.localeCompare(a.title));
-      case "longest":
-        return copy.sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0));
-      case "shortest":
-        return copy.sort((a, b) => (a.duration ?? Infinity) - (b.duration ?? Infinity));
-      case "last-watched":
-        return copy.sort((a, b) => {
-          const pa = watchProgress[a.id]?.lastWatched ?? 0;
-          const pb = watchProgress[b.id]?.lastWatched ?? 0;
-          return pb - pa;
-        });
-      default:
-        return copy;
-    }
-  }, [allVideos, searchQuery, sortBy, watchProgress]);
+    return filtered.sort((a, b) => b.addedAt - a.addedAt);
+  }, [allVideos, searchQuery]);
 
   const watchedCount = useMemo(
     () => Object.values(watchProgress).filter((p) => p.completed).length,
@@ -185,39 +148,6 @@ export default function HomeScreen() {
           )}
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.sortRow}
-        >
-          {SORT_OPTIONS.map((opt) => (
-            <Pressable
-              key={opt.key}
-              onPress={() => {
-                setSortBy(opt.key);
-                Haptics.selectionAsync();
-              }}
-              style={[
-                styles.sortChip,
-                { backgroundColor: C.surfaceElevated, borderColor: C.border },
-                sortBy === opt.key && { backgroundColor: C.accentSoft, borderColor: C.accent },
-              ]}
-            >
-              <Ionicons
-                name={opt.icon as any}
-                size={11}
-                color={sortBy === opt.key ? C.accent : C.textMuted}
-              />
-              <Text style={[
-                styles.sortChipText,
-                { color: C.textMuted },
-                sortBy === opt.key && { color: C.accent, fontFamily: "Inter_600SemiBold" },
-              ]}>
-                {opt.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
       </View>
 
       <FlatList
@@ -368,23 +298,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
-  },
-  sortRow: {
-    gap: 6,
-    paddingRight: 4,
-  },
-  sortChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  sortChipText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
   },
   list: {
     paddingTop: 10,

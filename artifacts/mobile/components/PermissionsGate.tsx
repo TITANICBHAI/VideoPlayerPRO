@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { usePlayer } from "@/context/PlayerContext";
 
 const C = Colors.dark;
 const ONBOARDED_KEY = "@videoplayer_onboarded";
@@ -23,6 +24,7 @@ export function PermissionsGate({ children }: Props) {
   const [ready, setReady] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [, requestPermission] = MediaLibrary.usePermissions();
+  const { refreshDeviceVideos } = usePlayer();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -50,6 +52,7 @@ export function PermissionsGate({ children }: Props) {
     await AsyncStorage.setItem(ONBOARDED_KEY, "true");
     setShowOnboarding(false);
     setReady(true);
+    refreshDeviceVideos();
   };
 
   const handleSkip = async () => {

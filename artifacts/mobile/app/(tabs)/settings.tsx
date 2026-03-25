@@ -15,7 +15,38 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "@/context/ThemeContext";
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
+
+const CHANGELOG = [
+  {
+    version: "1.1.0",
+    date: "Mar 2026",
+    changes: [
+      "Added first-launch tutorial walkthrough",
+      "Double-tap anywhere to seek — left half rewinds, right half skips",
+      "Fixed controls never auto-hiding during playback",
+      "Player buttons are now properly centred on screen",
+      "Removed confusing sort options from library",
+      "Device video removal no longer triggers a system permission dialog",
+      "Reduced UI re-renders for smoother scrolling and playback",
+      "Fixed video layout shifting in fullscreen/expanded mode",
+      "Device videos now load correctly on first permission grant",
+    ],
+  },
+  {
+    version: "1.0.0",
+    date: "Feb 2026",
+    changes: [
+      "Initial release",
+      "Add and manage video URLs",
+      "Device video discovery",
+      "Resume playback, watch progress tracking",
+      "Gesture controls: volume, brightness, seek",
+      "Picture-in-Picture support",
+      "Playback speed, loop modes, ambient mode",
+    ],
+  },
+];
 
 type RowProps = {
   icon: string;
@@ -239,6 +270,26 @@ export default function SettingsScreen() {
             chevron={false}
           />
         </View>
+
+        <SectionHeader title="What's New" />
+        {CHANGELOG.map((release) => (
+          <View key={release.version} style={[styles.card, { backgroundColor: C.surface, borderColor: C.border, marginBottom: 8 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 8 }}>
+              <View style={{ backgroundColor: C.accentSoft, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: C.accent }}>
+                <Text style={{ color: C.accent, fontSize: 11, fontFamily: "Inter_700Bold" }}>v{release.version}</Text>
+              </View>
+              <Text style={{ color: C.textMuted, fontSize: 11, fontFamily: "Inter_400Regular" }}>{release.date}</Text>
+            </View>
+            <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 14, marginBottom: 10 }} />
+            {release.changes.map((change, i) => (
+              <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, paddingHorizontal: 14, paddingBottom: 8 }}>
+                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.accent, marginTop: 6, flexShrink: 0 }} />
+                <Text style={{ color: C.textSecondary, fontSize: 12, fontFamily: "Inter_400Regular", flex: 1, lineHeight: 18 }}>{change}</Text>
+              </View>
+            ))}
+            <View style={{ height: 4 }} />
+          </View>
+        ))}
 
         <Text style={{
           color: C.textMuted, fontSize: 11, fontFamily: "Inter_400Regular",

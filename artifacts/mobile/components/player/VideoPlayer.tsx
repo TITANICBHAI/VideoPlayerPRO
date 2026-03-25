@@ -4,14 +4,13 @@ import * as ScreenOrientation from "expo-screen-orientation";
 import { useVideoPlayer, VideoView, type VideoViewRef } from "expo-video";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Dimensions,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
-import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -27,10 +26,11 @@ import { SettingsSheet } from "./SettingsSheet";
 import { StatsOverlay } from "./StatsOverlay";
 
 const C = Colors.dark;
-const { width: SCREEN_W } = Dimensions.get("window");
 const PROGRESS_SAVE_INTERVAL = 5000;
+const PLAYBACK_POLL_INTERVAL = 1000;
 
 export function VideoPlayer() {
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
   const {
     state,
     updatePlaybackInfo,
@@ -147,7 +147,7 @@ export function VideoPlayer() {
         });
         if (dur > 0) setIsBuffering(false);
       } catch {}
-    }, 500);
+    }, PLAYBACK_POLL_INTERVAL);
     return () => clearInterval(interval);
   }, [player, state.duration, state.audioNormalization]);
 
@@ -227,30 +227,12 @@ export function VideoPlayer() {
     [player, state.duration, state.currentTime, seekTo]
   );
 
-  const doubleTapLeft = Gesture.Tap()
-    .numberOfTaps(2)
-    .maxDuration(300)
-    .runOnJS(true)
-    .onEnd(() => {
-      if (state.isLocked) return;
-      handleSeekRelative(-10);
-    });
-
-  const doubleTapRight = Gesture.Tap()
-    .numberOfTaps(2)
-    .maxDuration(300)
-    .runOnJS(true)
-    .onEnd(() => {
-      if (state.isLocked) return;
-      handleSeekRelative(10);
-    });
-
   const ambientStyle = useAnimatedStyle(() => ({
     opacity: ambientOpacity.value,
   }));
 
   const playerHeight = state.isFullscreen
-    ? Dimensions.get("window").height
+    ? SCREEN_H
     : state.isTheaterMode
     ? SCREEN_W * (9 / 16) * 1.2
     : SCREEN_W * (9 / 16);
@@ -324,18 +306,9 @@ export function VideoPlayer() {
         </View>
       )}
 
-      <GestureOverlay onSeekRelative={handleSeekRelative}>
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <GestureDetector gesture={doubleTapLeft}>
-            <View style={styles.leftZone} />
-          </GestureDetector>
-          <GestureDetector gesture={doubleTapRight}>
-            <View style={styles.rightZone} />
-          </GestureDetector>
-        </View>
-      </GestureOverlay>
+      <GestureOverlay onSeekRelative={handleSeekRelative} />
 
-      <Controls onSeek={handleSeek} onSeekRelative={handleSeekRelative} onEnterPiP={handleEnterPiP} />
+      <Controls onSeek={handleSeek} onSeekRelative={handleSeekRelative} onEnterPiP={handleEnterPiP} screenWidth={SCREEN_W} />
 
       <SeekIndicator direction="left" seconds={10} visible={seekLeft} />
       <SeekIndicator direction="right" seconds={10} visible={seekRight} />
@@ -370,20 +343,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,0,51,0.12)",
     zIndex: 0,
     borderRadius: 999,
-  },
-  leftZone: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: "28%",
-  },
-  rightZone: {
-    position: "absolute",
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: "28%",
   },
   bufferingOverlay: {
     ...StyleSheet.absoluteFillObject,
