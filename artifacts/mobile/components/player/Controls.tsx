@@ -58,9 +58,11 @@ export function Controls({ onSeek, onSeekRelative, onEnterPiP, screenWidth }: Pr
   const opacity = useSharedValue(1);
   const showSettingsRef = useRef(state.showSettings);
   const isLockedRef = useRef(state.isLocked);
+  const showControlsRef = useRef(state.showControls);
 
   useEffect(() => { showSettingsRef.current = state.showSettings; }, [state.showSettings]);
   useEffect(() => { isLockedRef.current = state.isLocked; }, [state.isLocked]);
+  useEffect(() => { showControlsRef.current = state.showControls; }, [state.showControls]);
 
   const resetHideTimer = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -148,8 +150,8 @@ export function Controls({ onSeek, onSeekRelative, onEnterPiP, screenWidth }: Pr
     .maxDuration(250)
     .runOnJS(true)
     .onEnd(() => {
-      if (state.isLocked) return;
-      if (state.showControls) {
+      if (isLockedRef.current) return;
+      if (showControlsRef.current) {
         opacity.value = withTiming(0, { duration: 200 });
         setShowControls(false);
       } else {
@@ -162,7 +164,7 @@ export function Controls({ onSeek, onSeekRelative, onEnterPiP, screenWidth }: Pr
     .maxDuration(300)
     .runOnJS(true)
     .onEnd((e) => {
-      if (state.isLocked) return;
+      if (isLockedRef.current) return;
       const isLeft = e.x < screenWidth / 2;
       onSeekRelative(isLeft ? -10 : 10);
       resetHideTimer();

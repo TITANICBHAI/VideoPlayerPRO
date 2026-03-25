@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useRef, useState } from "react";
-import { Dimensions, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
@@ -8,9 +8,7 @@ import Colors from "@/constants/colors";
 import { usePlayer } from "@/context/PlayerContext";
 
 const C = Colors.dark;
-const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
 const SWIPE_THRESHOLD = 60;
-const GESTURE_ZONE_W = SCREEN_W * 0.3;
 const MAX_VOL = 2.0;
 const MAX_BRIGHT = 2.0;
 
@@ -59,6 +57,9 @@ type Props = {
 
 export function GestureOverlay(_props: Props) {
   const { state, setVolume, setBrightness, setFullscreen } = usePlayer();
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
+  const GESTURE_ZONE_W = SCREEN_W * 0.3;
+
   const [gestureType, setGestureType] = useState<GestureIndicatorType>("none");
   const [gestureValue, setGestureValue] = useState(0);
   const gestureHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,6 +67,14 @@ export function GestureOverlay(_props: Props) {
   const startX = useRef(0);
   const startVol = useRef(state.volume);
   const startBright = useRef(state.brightness);
+  const screenWRef = useRef(SCREEN_W);
+  const screenHRef = useRef(SCREEN_H);
+  const gestureZoneWRef = useRef(GESTURE_ZONE_W);
+
+  // Keep dimension refs current so gesture handlers always use latest values
+  screenWRef.current = SCREEN_W;
+  screenHRef.current = SCREEN_H;
+  gestureZoneWRef.current = GESTURE_ZONE_W;
 
   const showGesture = useCallback((type: GestureIndicatorType, value: number) => {
     setGestureType(type);
@@ -85,13 +94,13 @@ export function GestureOverlay(_props: Props) {
     .onUpdate((e) => {
       const deltaY = e.translationY;
       const x = startX.current;
-      const playerH = SCREEN_H * 0.35;
+      const playerH = screenHRef.current * 0.35;
 
-      if (x < GESTURE_ZONE_W) {
+      if (x < gestureZoneWRef.current) {
         const newVal = Math.max(0.05, Math.min(MAX_BRIGHT, startBright.current - deltaY / playerH));
         setBrightness(newVal);
         showGesture("brightness", newVal);
-      } else if (x > SCREEN_W - GESTURE_ZONE_W) {
+      } else if (x > screenWRef.current - gestureZoneWRef.current) {
         const newVal = Math.max(0, Math.min(MAX_VOL, startVol.current - deltaY / playerH));
         setVolume(newVal);
         showGesture("volume", newVal);
@@ -100,7 +109,7 @@ export function GestureOverlay(_props: Props) {
     .onEnd((e) => {
       const deltaY = e.translationY;
       const x = startX.current;
-      const isMidZone = x >= GESTURE_ZONE_W && x <= SCREEN_W - GESTURE_ZONE_W;
+      const isMidZone = x >= gestureZoneWRef.current && x <= screenWRef.current - gestureZoneWRef.current;
 
       if (isMidZone && Math.abs(deltaY) > SWIPE_THRESHOLD) {
         if (deltaY < -SWIPE_THRESHOLD && !state.isFullscreen) {

@@ -134,14 +134,13 @@ export function VideoPlayer() {
         const dur = player.duration ?? 0;
         currentTimeRef.current = ct;
         durationRef.current = dur > 0 ? dur : durationRef.current;
-        const bufferHealth = Math.min(dur, ct + Math.random() * 30 + 10);
         updatePlaybackInfo({
           currentTime: ct,
           duration: dur > 0 ? dur : state.duration,
-          buffered: bufferHealth,
+          buffered: Math.min(dur, ct + 15),
           isLoading: false,
-          connectionSpeed: Math.random() * 5000 + 2000,
-          droppedFrames: Math.floor(Math.random() * 2),
+          connectionSpeed: 0,
+          droppedFrames: 0,
           resolution: "1920x1080",
           codec: state.audioNormalization ? "H.264 (Normalized)" : "H.264 (AVC)",
         });
@@ -275,7 +274,7 @@ export function VideoPlayer() {
         contentFit={contentFit}
         nativeControls={false}
         allowsPictureInPicture={Platform.OS !== "web"}
-        startsPictureInPictureAutomatically={Platform.OS !== "web"}
+        startsPictureInPictureAutomatically={Platform.OS !== "web" && state.backgroundPlayback}
       />
 
       {brightnessBoost > 0 && (
