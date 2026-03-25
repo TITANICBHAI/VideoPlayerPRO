@@ -24,7 +24,6 @@ export default function PlayerScreen() {
   const insets = useSafeAreaInsets();
 
   const chapters = state.currentVideo?.chapters ?? [];
-
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
 
   return (
@@ -36,11 +35,18 @@ export default function PlayerScreen() {
               router.back();
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             }}
-            style={styles.backBtn}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           >
-            <Ionicons name="chevron-down" size={22} color={C.text} />
+            <Ionicons name="chevron-down" size={20} color={C.text} />
           </Pressable>
-          <Text style={styles.nowPlaying}>Now Playing</Text>
+          <View style={styles.topBarCenter}>
+            <Text style={styles.nowPlayingLabel}>NOW PLAYING</Text>
+            {state.currentVideo && (
+              <Text style={styles.nowPlayingTitle} numberOfLines={1}>
+                {state.currentVideo.title}
+              </Text>
+            )}
+          </View>
           <View style={{ width: 36 }} />
         </View>
       )}
@@ -51,16 +57,37 @@ export default function PlayerScreen() {
         <ScrollView style={styles.below} contentContainerStyle={styles.belowContent} showsVerticalScrollIndicator={false}>
           {state.currentVideo && (
             <View style={styles.videoInfo}>
-              <Text style={styles.videoTitle}>{state.currentVideo.title}</Text>
-              {state.currentVideo.duration && (
-                <Text style={styles.videoDuration}>{formatTime(state.currentVideo.duration)}</Text>
-              )}
+              <View style={styles.videoInfoLeft}>
+                <Text style={styles.videoTitle}>{state.currentVideo.title}</Text>
+                <View style={styles.videoMeta}>
+                  {state.currentVideo.isDeviceVideo ? (
+                    <View style={[styles.sourceChip, styles.sourceChipDevice]}>
+                      <Ionicons name="phone-portrait" size={10} color="#64B5F6" />
+                      <Text style={[styles.sourceChipText, { color: "#64B5F6" }]}>On Device</Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.sourceChip, styles.sourceChipUrl]}>
+                      <Ionicons name="link" size={10} color={C.textMuted} />
+                      <Text style={styles.sourceChipText}>URL Stream</Text>
+                    </View>
+                  )}
+                  {state.currentVideo.duration ? (
+                    <View style={styles.durationRow}>
+                      <Ionicons name="time-outline" size={11} color={C.textMuted} />
+                      <Text style={styles.videoDuration}>{formatTime(state.currentVideo.duration)}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
             </View>
           )}
 
           {chapters.length > 0 && (
             <View style={styles.chaptersSection}>
-              <Text style={styles.sectionTitle}>Chapters</Text>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Chapters</Text>
+                <Text style={styles.sectionCount}>{chapters.length}</Text>
+              </View>
               {chapters.map((ch, i) => (
                 <Pressable
                   key={i}
@@ -101,25 +128,36 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
+    gap: 8,
   },
   backBtn: {
     width: 36,
     height: 36,
-    borderRadius: 999,
-    backgroundColor: C.controlBg,
+    borderRadius: 12,
+    backgroundColor: C.surfaceElevated,
+    borderWidth: 1,
+    borderColor: C.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  nowPlaying: {
+  topBarCenter: {
     flex: 1,
-    textAlign: "center",
-    color: C.textSecondary,
+    alignItems: "center",
+    gap: 1,
+  },
+  nowPlayingLabel: {
+    color: C.textMuted,
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 1.2,
+  },
+  nowPlayingTitle: {
+    color: C.text,
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
+    letterSpacing: -0.1,
   },
   below: {
     flex: 1,
@@ -128,30 +166,68 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   videoInfo: {
-    padding: 16,
-    paddingBottom: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  videoInfoLeft: {
+    gap: 7,
   },
   videoTitle: {
-    flex: 1,
     color: C.text,
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: "Inter_700Bold",
-    lineHeight: 22,
+    lineHeight: 23,
+    letterSpacing: -0.4,
+  },
+  videoMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sourceChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  sourceChipUrl: {
+    backgroundColor: C.surfaceElevated,
+    borderColor: C.border,
+  },
+  sourceChipDevice: {
+    backgroundColor: "rgba(100,181,246,0.1)",
+    borderColor: "rgba(100,181,246,0.3)",
+  },
+  sourceChipText: {
+    color: C.textMuted,
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+  },
+  durationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   videoDuration: {
     color: C.textMuted,
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
-    flexShrink: 0,
-    marginTop: 2,
   },
   chaptersSection: {
-    marginTop: 4,
     paddingHorizontal: 16,
+    paddingTop: 18,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
   },
   sectionTitle: {
     color: C.textSecondary,
@@ -159,23 +235,34 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.8,
     textTransform: "uppercase",
-    marginBottom: 10,
+  },
+  sectionCount: {
+    backgroundColor: C.surfaceElevated,
+    color: C.textMuted,
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 999,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: C.border,
   },
   chapterItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
   chapterItemPressed: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   chapterNum: {
     width: 28,
     height: 28,
-    borderRadius: 14,
+    borderRadius: 9,
     backgroundColor: C.surfaceElevated,
     alignItems: "center",
     justifyContent: "center",

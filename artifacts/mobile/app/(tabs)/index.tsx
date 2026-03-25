@@ -84,23 +84,28 @@ export default function HomeScreen() {
       <View style={[styles.header, { borderBottomColor: C.border }]}>
         <View style={styles.headerTop}>
           <View style={styles.logoArea}>
-            <View style={[styles.logoDot, { backgroundColor: C.accent }]} />
-            <Text style={[styles.logoText, { color: C.text }]}>VideoPlayer</Text>
-            <View style={[styles.logoBadge, { backgroundColor: C.accent }]}>
-              <Text style={styles.logoBadgeText}>PRO</Text>
+            <View style={[styles.logoIcon, { backgroundColor: C.accent }]}>
+              <Ionicons name="play" size={12} color="#fff" />
+            </View>
+            <View>
+              <Text style={[styles.logoText, { color: C.text }]}>VideoPlayer</Text>
+              <Text style={[styles.logoSub, { color: C.textMuted }]}>Your private library</Text>
+            </View>
+            <View style={[styles.logoBadge, { backgroundColor: C.accentSoft, borderColor: "rgba(255,0,51,0.35)" }]}>
+              <Text style={[styles.logoBadgeText, { color: C.accent }]}>PRO</Text>
             </View>
           </View>
           <Pressable
             onPress={() => setShowAddModal(true)}
             style={({ pressed }) => [styles.addBtn, { backgroundColor: C.accent }, pressed && styles.addBtnPressed]}
           >
-            <Ionicons name="add" size={20} color="#fff" />
+            <Ionicons name="add" size={22} color="#fff" />
           </Pressable>
         </View>
 
         <View style={styles.searchRow}>
           <View style={[styles.searchBar, { backgroundColor: C.surfaceElevated, borderColor: C.border }]}>
-            <Ionicons name="search" size={16} color={C.textMuted} />
+            <Ionicons name="search" size={15} color={C.textMuted} />
             <TextInput
               style={[styles.searchInput, { color: C.text }]}
               placeholder="Search videos..."
@@ -110,7 +115,7 @@ export default function HomeScreen() {
               returnKeyType="search"
             />
             {searchQuery.length > 0 && (
-              <Pressable onPress={() => setSearchQuery("")}>
+              <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
                 <Ionicons name="close-circle" size={16} color={C.textMuted} />
               </Pressable>
             )}
@@ -119,31 +124,31 @@ export default function HomeScreen() {
 
         <View style={styles.statsRow}>
           <View style={[styles.statChip, { backgroundColor: C.surfaceElevated, borderColor: C.border }]}>
-            <Ionicons name="library-outline" size={12} color={C.accent} />
+            <Ionicons name="film" size={11} color={C.accent} />
             <Text style={[styles.statText, { color: C.textSecondary }]}>{videos.length} videos</Text>
           </View>
           {deviceVideos.length > 0 && (
-            <View style={[styles.statChip, { backgroundColor: C.surfaceElevated, borderColor: C.border }]}>
-              <Ionicons name="phone-portrait-outline" size={12} color="#64B5F6" />
+            <View style={[styles.statChip, { backgroundColor: "rgba(100,181,246,0.08)", borderColor: "rgba(100,181,246,0.25)" }]}>
+              <Ionicons name="phone-portrait" size={11} color="#64B5F6" />
               <Text style={[styles.statText, { color: "#64B5F6" }]}>{deviceVideos.length} on device</Text>
             </View>
           )}
           {watchedCount > 0 && (
-            <View style={[styles.statChip, { backgroundColor: C.surfaceElevated, borderColor: C.border }]}>
-              <Ionicons name="checkmark-circle-outline" size={12} color="#4CAF50" />
+            <View style={[styles.statChip, { backgroundColor: "rgba(76,175,80,0.08)", borderColor: "rgba(76,175,80,0.25)" }]}>
+              <Ionicons name="checkmark-circle" size={11} color="#4CAF50" />
               <Text style={[styles.statText, { color: "#4CAF50" }]}>{watchedCount} watched</Text>
             </View>
           )}
           {state.currentVideo && (
             <Pressable
               onPress={() => router.push("/player")}
-              style={[styles.nowPlayingChip, { backgroundColor: C.accentSoft, borderColor: C.accent }]}
+              style={[styles.nowPlayingChip, { backgroundColor: C.accentSoft, borderColor: "rgba(255,0,51,0.4)" }]}
             >
               <View style={[styles.nowPlayingDot, { backgroundColor: C.accent }]} />
               <Text style={[styles.nowPlayingChipText, { color: C.accent }]} numberOfLines={1}>
                 {state.currentVideo.title}
               </Text>
-              <Ionicons name="chevron-forward" size={12} color={C.accent} />
+              <Ionicons name="chevron-forward" size={11} color={C.accent} />
             </Pressable>
           )}
         </View>
@@ -198,10 +203,10 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    gap: 10,
-    paddingTop: 4,
+    gap: 12,
+    paddingTop: 6,
   },
   headerTop: {
     flexDirection: "row",
@@ -211,48 +216,59 @@ const styles = StyleSheet.create({
   logoArea: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
+    flex: 1,
   },
-  logoDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  logoText: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.5,
-  },
-  logoBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  logoBadgeText: {
-    color: "#fff",
-    fontSize: 9,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
-  },
-  addBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  logoIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
+  },
+  logoText: {
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.4,
+    lineHeight: 20,
+  },
+  logoSub: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 13,
+  },
+  logoBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    borderWidth: 1,
+  },
+  logoBadgeText: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.8,
+  },
+  addBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
   addBtnPressed: {
     opacity: 0.8,
-    transform: [{ scale: 0.95 }],
+    transform: [{ scale: 0.94 }],
   },
   searchRow: {},
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 13,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
     borderWidth: 1,
   },
   searchInput: {
@@ -263,7 +279,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 7,
     flexWrap: "wrap",
   },
   statChip: {

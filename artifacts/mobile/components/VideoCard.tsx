@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useRef } from "react";
 import {
   Alert,
@@ -31,9 +32,7 @@ function confirmDelete(title: string, onDelete: () => void) {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   Alert.alert(
     "Delete Video",
-    `Remove "${title}" from your library?${"\n"}${
-      title ? "" : ""
-    }`,
+    `Remove "${title}" from your library?`,
     [
       { text: "Cancel", style: "cancel" },
       {
@@ -49,13 +48,12 @@ function confirmDelete(title: string, onDelete: () => void) {
   );
 }
 
-function renderRightActions(onDelete: () => void) {
+function RightActions({ onDelete }: { onDelete: () => void }) {
   return (
-    <Pressable
-      onPress={onDelete}
-      style={styles.swipeDeleteBtn}
-    >
-      <Ionicons name="trash-outline" size={20} color="#fff" />
+    <Pressable onPress={onDelete} style={styles.swipeDeleteBtn}>
+      <View style={styles.swipeDeleteIcon}>
+        <Ionicons name="trash" size={18} color="#fff" />
+      </View>
       <Text style={styles.swipeDeleteText}>Delete</Text>
     </Pressable>
   );
@@ -65,22 +63,12 @@ export const VideoCard = React.memo(function VideoCard({ video, progress, onPres
   const scale = useRef(new Animated.Value(1)).current;
   const swipeableRef = useRef<Swipeable>(null);
 
-  const handlePressIn = () => {
-    Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 50 }).start();
-  };
-
-  const handlePressOut = () => {
+  const handlePressIn = () =>
+    Animated.spring(scale, { toValue: 0.975, useNativeDriver: true, speed: 50 }).start();
+  const handlePressOut = () =>
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20 }).start();
-  };
-
-  const handleLongPress = () => {
-    confirmDelete(video.title, onDelete);
-  };
-
-  const handleMenuPress = () => {
-    confirmDelete(video.title, onDelete);
-  };
-
+  const handleLongPress = () => confirmDelete(video.title, onDelete);
+  const handleMenuPress = () => confirmDelete(video.title, onDelete);
   const handleSwipeDelete = () => {
     swipeableRef.current?.close();
     confirmDelete(video.title, onDelete);
@@ -93,10 +81,20 @@ export const VideoCard = React.memo(function VideoCard({ video, progress, onPres
 
   const thumbnailUri = video.thumbnail ?? null;
 
+  const dateStr = (() => {
+    const d = new Date(video.addedAt);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - d.getTime()) / 86400000);
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Yesterday";
+    if (diff < 7) return `${diff}d ago`;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  })();
+
   return (
     <Swipeable
       ref={swipeableRef}
-      renderRightActions={() => renderRightActions(handleSwipeDelete)}
+      renderRightActions={() => <RightActions onDelete={handleSwipeDelete} />}
       overshootRight={false}
       friction={2}
       rightThreshold={60}
@@ -110,6 +108,7 @@ export const VideoCard = React.memo(function VideoCard({ video, progress, onPres
           delayLongPress={450}
           style={[styles.card, isActive && styles.cardActive]}
         >
+          {/* Thumbnail */}
           <View style={styles.thumbnail}>
             {thumbnailUri ? (
               <Image
@@ -120,28 +119,44 @@ export const VideoCard = React.memo(function VideoCard({ video, progress, onPres
               />
             ) : (
               <View style={styles.thumbBg}>
-                <Ionicons name="film-outline" size={28} color="rgba(255,255,255,0.2)" />
+                <Ionicons name="film" size={26} color="rgba(255,255,255,0.12)" />
               </View>
             )}
 
+            {/* Gradient overlay */}
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.7)"]}
+              style={styles.thumbGradient}
+            />
+
+            {/* Play / active overlay */}
+            {isActive ? (
+              <View style={styles.activeOverlay}>
+                <View style={styles.activeRing}>
+                  <Ionicons name="pause" size={14} color={C.accent} />
+                </View>
+              </View>
+            ) : (
+              <View style={styles.playOverlay}>
+                <Ionicons name="play" size={13} color="rgba(255,255,255,0.7)" />
+              </View>
+            )}
+
+            {/* Duration */}
             {video.duration ? (
               <View style={styles.durationBadge}>
                 <Text style={styles.durationText}>{formatTime(video.duration)}</Text>
               </View>
             ) : null}
 
-            {isActive && (
-              <View style={styles.activeDot}>
-                <View style={styles.activeDotInner} />
-              </View>
-            )}
-
+            {/* Completed */}
             {progress?.completed && (
               <View style={styles.completedBadge}>
                 <Ionicons name="checkmark" size={9} color="#fff" />
               </View>
             )}
 
+            {/* Progress bar */}
             {progressPercent > 0 && !progress?.completed && (
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: `${progressPercent * 100}%` as any }]} />
@@ -149,43 +164,45 @@ export const VideoCard = React.memo(function VideoCard({ video, progress, onPres
             )}
           </View>
 
+          {/* Info */}
           <View style={styles.info}>
             <Text style={[styles.title, isActive && styles.titleActive]} numberOfLines={2}>
               {video.title}
             </Text>
-            <View style={styles.meta}>
+
+            <View style={styles.tags}>
               {video.isDeviceVideo && (
-                <View style={[styles.metaTag, styles.metaTagDevice]}>
-                  <Ionicons name="phone-portrait-outline" size={10} color="#64B5F6" />
-                  <Text style={[styles.metaTagText, { color: "#64B5F6" }]}>On Device</Text>
+                <View style={[styles.tag, styles.tagDevice]}>
+                  <Ionicons name="phone-portrait" size={9} color="#64B5F6" />
+                  <Text style={[styles.tagText, { color: "#64B5F6" }]}>Device</Text>
                 </View>
               )}
-              {video.chapters && video.chapters.length > 0 ? (
-                <View style={styles.metaTag}>
-                  <Ionicons name="list-outline" size={10} color={C.textMuted} />
-                  <Text style={styles.metaTagText}>{video.chapters.length} chapters</Text>
+              {video.chapters && video.chapters.length > 0 && (
+                <View style={styles.tag}>
+                  <Ionicons name="list" size={9} color={C.textMuted} />
+                  <Text style={styles.tagText}>{video.chapters.length} ch</Text>
                 </View>
-              ) : null}
-              {progress && !progress.completed && progressPercent > 0 ? (
-                <View style={[styles.metaTag, styles.metaTagResume]}>
-                  <Ionicons name="play-outline" size={10} color={C.accent} />
-                  <Text style={[styles.metaTagText, { color: C.accent }]}>
-                    {formatTime(progress.position)} left
+              )}
+              {progress && !progress.completed && progressPercent > 0 && (
+                <View style={[styles.tag, styles.tagResume]}>
+                  <Ionicons name="play" size={9} color={C.accent} />
+                  <Text style={[styles.tagText, { color: C.accent }]}>
+                    Resume · {formatTime(progress.position)}
                   </Text>
                 </View>
-              ) : null}
-              <Text style={styles.metaDate}>
-                {new Date(video.addedAt).toLocaleDateString()}
-              </Text>
+              )}
             </View>
+
+            <Text style={styles.metaDate}>{dateStr}</Text>
           </View>
 
+          {/* Menu */}
           <Pressable
             onPress={handleMenuPress}
             hitSlop={8}
-            style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.5 }]}
+            style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.4 }]}
           >
-            <Ionicons name="ellipsis-vertical" size={16} color={C.textMuted} />
+            <Ionicons name="ellipsis-vertical" size={15} color={C.textMuted} />
           </Pressable>
         </Pressable>
       </Animated.View>
@@ -195,14 +212,14 @@ export const VideoCard = React.memo(function VideoCard({ video, progress, onPres
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginHorizontal: 16,
-    marginVertical: 4,
+    marginHorizontal: 14,
+    marginVertical: 3,
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: C.surface,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 10,
     gap: 12,
     borderWidth: 1,
@@ -210,62 +227,76 @@ const styles = StyleSheet.create({
   },
   cardActive: {
     borderColor: C.accent,
-    backgroundColor: C.accentSoft,
+    backgroundColor: "rgba(255,0,51,0.07)",
   },
   thumbnail: {
-    width: 100,
-    height: 62,
+    width: 108,
+    height: 68,
     borderRadius: 10,
     overflow: "hidden",
-    position: "relative",
     flexShrink: 0,
+    backgroundColor: C.surfaceElevated,
   },
   thumbBg: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: C.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  thumbGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  playOverlay: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: [{ translateX: -14 }, { translateY: -14 }],
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  activeOverlay: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: [{ translateX: -14 }, { translateY: -14 }],
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: C.accentSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activeRing: {
     alignItems: "center",
     justifyContent: "center",
   },
   durationBadge: {
     position: "absolute",
-    bottom: 4,
-    right: 4,
-    backgroundColor: "rgba(0,0,0,0.75)",
+    bottom: 5,
+    right: 5,
+    backgroundColor: "rgba(0,0,0,0.8)",
     paddingHorizontal: 5,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 5,
   },
   durationText: {
-    color: C.text,
+    color: "#fff",
     fontSize: 9,
     fontFamily: "Inter_600SemiBold",
   },
-  activeDot: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: [{ translateX: -12 }, { translateY: -12 }],
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,0,51,0.3)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  activeDotInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: C.accent,
-  },
   completedBadge: {
     position: "absolute",
-    top: 4,
-    right: 4,
+    top: 5,
+    right: 5,
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: C.accent,
+    backgroundColor: "#4CAF50",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -275,7 +306,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 3,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.15)",
   },
   progressFill: {
     height: 3,
@@ -284,43 +315,44 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
-    gap: 6,
+    gap: 5,
   },
   title: {
     color: C.text,
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     lineHeight: 18,
+    letterSpacing: -0.1,
   },
   titleActive: {
     color: C.accent,
   },
-  meta: {
+  tags: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
     flexWrap: "wrap",
   },
-  metaTag: {
+  tag: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
     backgroundColor: C.surfaceElevated,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: C.border,
   },
-  metaTagResume: {
+  tagResume: {
     backgroundColor: C.accentSoft,
-    borderWidth: 1,
-    borderColor: C.accent,
+    borderColor: "rgba(255,0,51,0.35)",
   },
-  metaTagDevice: {
-    backgroundColor: "rgba(100, 181, 246, 0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(100, 181, 246, 0.4)",
+  tagDevice: {
+    backgroundColor: "rgba(100,181,246,0.1)",
+    borderColor: "rgba(100,181,246,0.35)",
   },
-  metaTagText: {
+  tagText: {
     color: C.textMuted,
     fontSize: 9,
     fontFamily: "Inter_500Medium",
@@ -332,23 +364,32 @@ const styles = StyleSheet.create({
   },
   menuBtn: {
     paddingHorizontal: 4,
-    paddingVertical: 8,
+    paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   swipeDeleteBtn: {
-    width: 80,
-    marginVertical: 4,
-    marginRight: 16,
-    backgroundColor: "#E53935",
-    borderRadius: 14,
+    width: 78,
+    marginVertical: 3,
+    marginRight: 14,
+    backgroundColor: "#C62828",
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 5,
+  },
+  swipeDeleteIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   swipeDeleteText: {
     color: "#fff",
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.3,
   },
 });
