@@ -29,6 +29,24 @@
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_EXTERNAL_STORAGE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            { "scheme": "http", "mimeType": "video/*" },
+            { "scheme": "https", "mimeType": "video/*" },
+            { "scheme": "http", "mimeType": "*/*" },
+            { "scheme": "https", "mimeType": "*/*" },
+            { "scheme": "mobile" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "SEND",
+          "data": [{ "mimeType": "text/plain" }],
+          "category": ["DEFAULT"]
+        }
       ]
     },
     "web": {
@@ -52,7 +70,7 @@
         "photosPermission": "VideoPlayer PRO uses your media library to discover videos saved on your device.",
         "savePhotosPermission": "Allow VideoPlayer PRO to save videos to your library.",
         "isAccessMediaLocationEnabled": true
-      }]
+      }],
     ],
     "experiments": {
       "typedRoutes": true,

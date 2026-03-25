@@ -11,6 +11,8 @@ const C = Colors.dark;
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
 const SWIPE_THRESHOLD = 60;
 const GESTURE_ZONE_W = SCREEN_W * 0.3;
+const MAX_VOL = 2.0;
+const MAX_BRIGHT = 2.0;
 
 type GestureIndicatorType = "volume" | "brightness" | "none";
 
@@ -18,6 +20,8 @@ function GestureIndicator({ type, value }: { type: GestureIndicatorType; value: 
   if (type === "none") return null;
   const isVolume = type === "volume";
   const pct = Math.round(value * 100);
+  const fillPct = Math.min(100, (value / (isVolume ? MAX_VOL : MAX_BRIGHT)) * 100);
+  const isBoosted = value > 1.0;
 
   return (
     <Animated.View
@@ -26,11 +30,25 @@ function GestureIndicator({ type, value }: { type: GestureIndicatorType; value: 
       style={[styles.indicator, isVolume ? styles.indicatorRight : styles.indicatorLeft]}
       pointerEvents="none"
     >
-      <Text style={styles.indicatorIcon}>{isVolume ? "🔊" : "☀"}</Text>
+      <Text style={styles.indicatorIcon}>
+        {isVolume ? (value === 0 ? "🔇" : "🔊") : "☀"}
+      </Text>
       <View style={styles.indicatorBar}>
-        <View style={[styles.indicatorFill, { height: `${pct}%` as any }]} />
+        <View
+          style={[
+            styles.indicatorFill,
+            { height: `${fillPct}%` as any },
+            isBoosted && styles.indicatorFillBoost,
+          ]}
+        />
+        <View style={styles.indicatorMidMark} />
       </View>
-      <Text style={styles.indicatorPct}>{pct}%</Text>
+      <Text style={[styles.indicatorPct, isBoosted && styles.indicatorPctBoost]}>
+        {pct}%
+      </Text>
+      {isBoosted && (
+        <Text style={styles.boostLabel}>BOOST</Text>
+      )}
     </Animated.View>
   );
 }
@@ -71,11 +89,11 @@ export function GestureOverlay({ children }: Props) {
       const playerH = SCREEN_H * 0.35;
 
       if (x < GESTURE_ZONE_W) {
-        const newVal = Math.max(0.05, Math.min(1, startBright.current - deltaY / playerH));
+        const newVal = Math.max(0.05, Math.min(MAX_BRIGHT, startBright.current - deltaY / playerH));
         setBrightness(newVal);
         showGesture("brightness", newVal);
       } else if (x > SCREEN_W - GESTURE_ZONE_W) {
-        const newVal = Math.max(0, Math.min(1, startVol.current - deltaY / playerH));
+        const newVal = Math.max(0, Math.min(MAX_VOL, startVol.current - deltaY / playerH));
         setVolume(newVal);
         showGesture("volume", newVal);
       }
@@ -112,12 +130,12 @@ const styles = StyleSheet.create({
     top: "20%",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(0,0,0,0.78)",
+    backgroundColor: "rgba(0,0,0,0.82)",
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
-    minWidth: 52,
+    minWidth: 56,
     zIndex: 200,
   },
   indicatorLeft: { left: 16 },
@@ -128,17 +146,39 @@ const styles = StyleSheet.create({
     height: 80,
     backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: 2,
-    overflow: "hidden",
+    overflow: "visible",
     justifyContent: "flex-end",
+    position: "relative",
   },
   indicatorFill: {
     width: "100%",
     backgroundColor: C.accent,
     borderRadius: 2,
   },
+  indicatorFillBoost: {
+    backgroundColor: "#FFD54F",
+  },
+  indicatorMidMark: {
+    position: "absolute",
+    bottom: "50%",
+    left: -3,
+    right: -3,
+    height: 2,
+    backgroundColor: "rgba(255,255,255,0.4)",
+    borderRadius: 1,
+  },
   indicatorPct: {
     color: C.text,
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
+  },
+  indicatorPctBoost: {
+    color: "#FFD54F",
+  },
+  boostLabel: {
+    color: "#FFD54F",
+    fontSize: 8,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
   },
 });

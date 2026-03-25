@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useVideoPlayer, VideoView, type VideoViewRef } from "expo-video";
@@ -5,7 +6,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Platform,
+  Pressable,
   StyleSheet,
+  Text,
   View,
 } from "react-native";
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
@@ -39,6 +42,8 @@ export function VideoPlayer() {
 
   const [seekLeft, setSeekLeft] = useState(false);
   const [seekRight, setSeekRight] = useState(false);
+  const [playerError, setPlayerError] = useState<string | null>(null);
+  const [isBuffering, setIsBuffering] = useState(false);
   const seekLeftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekRightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ambientOpacity = useSharedValue(0);
@@ -50,7 +55,7 @@ export function VideoPlayer() {
 
   const player = useVideoPlayer(state.currentVideo?.uri ?? null, (p) => {
     p.muted = state.isMuted;
-    p.volume = state.volume;
+    p.volume = Math.min(1, state.volume);
     p.playbackRate = state.playbackRate;
   });
 
@@ -69,17 +74,24 @@ export function VideoPlayer() {
 
   useEffect(() => {
     if (!player) return;
-    try { player.volume = state.volume; } catch {}
+    try {
+      player.volume = Math.min(1, state.volume);
+    } catch {}
   }, [state.volume]);
 
   useEffect(() => {
     if (!player) return;
-    try { player.playbackRate = state.playbackRate; } catch {}
+    try {
+      player.playbackRate = state.playbackRate;
+      (player as any).preservesPitch = true;
+    } catch {}
   }, [state.playbackRate]);
 
   useEffect(() => {
     if (!player || !state.currentVideo) return;
     hasResumed.current = false;
+    setPlayerError(null);
+    setIsBuffering(true);
     try {
       player.replace(state.currentVideo.uri);
       const startAt = state.resumePosition;
@@ -94,6 +106,25 @@ export function VideoPlayer() {
       }, 300);
     } catch {}
   }, [state.currentVideo?.id]);
+
+  useEffect(() => {
+    if (!player) return;
+    let subscription: any;
+    try {
+      subscription = (player as any).addListener?.("statusChange", ({ status, error }: any) => {
+        if (status === "error") {
+          setPlayerError(error?.message ?? "Failed to load video");
+          setIsBuffering(false);
+        } else if (status === "readyToPlay") {
+          setPlayerError(null);
+          setIsBuffering(false);
+        } else if (status === "loading") {
+          setIsBuffering(true);
+        }
+      });
+    } catch {}
+    return () => { try { subscription?.remove?.(); } catch {} };
+  }, [player]);
 
   useEffect(() => {
     if (!player) return;
@@ -114,6 +145,7 @@ export function VideoPlayer() {
           resolution: "1920x1080",
           codec: state.audioNormalization ? "H.264 (Normalized)" : "H.264 (AVC)",
         });
+        if (dur > 0) setIsBuffering(false);
       } catch {}
     }, 500);
     return () => clearInterval(interval);
@@ -225,6 +257,21 @@ export function VideoPlayer() {
 
   const contentFit = state.fitMode === "cover" ? "cover" : "contain";
 
+  const brightnessBoost = state.brightness > 1
+    ? Math.min(0.75, (state.brightness - 1) * 0.75)
+    : 0;
+
+  const handleRetry = () => {
+    setPlayerError(null);
+    setIsBuffering(true);
+    if (state.currentVideo && player) {
+      try {
+        player.replace(state.currentVideo.uri);
+        setTimeout(() => { try { player.play(); } catch {} }, 300);
+      } catch {}
+    }
+  };
+
   return (
     <View
       style={[
@@ -248,6 +295,34 @@ export function VideoPlayer() {
         allowsPictureInPicture={Platform.OS !== "web"}
         startsPictureInPictureAutomatically={Platform.OS !== "web"}
       />
+
+      {brightnessBoost > 0 && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: "#FFFFFF", opacity: brightnessBoost, zIndex: 1 },
+          ]}
+          pointerEvents="none"
+        />
+      )}
+
+      {isBuffering && !playerError && (
+        <View style={styles.bufferingOverlay} pointerEvents="none">
+          <View style={styles.bufferingSpinner} />
+        </View>
+      )}
+
+      {playerError && (
+        <View style={styles.errorOverlay}>
+          <Ionicons name="warning-outline" size={44} color="#FF5252" />
+          <Text style={styles.errorTitle}>Can't play this video</Text>
+          <Text style={styles.errorMsg} numberOfLines={3}>{playerError}</Text>
+          <Pressable onPress={handleRetry} style={styles.retryBtn}>
+            <Ionicons name="refresh" size={16} color="#fff" />
+            <Text style={styles.retryText}>Retry</Text>
+          </Pressable>
+        </View>
+      )}
 
       <GestureOverlay onSeekRelative={handleSeekRelative}>
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -309,5 +384,56 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: "28%",
+  },
+  bufferingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 5,
+  },
+  bufferingSpinner: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.15)",
+    borderTopColor: C.accent,
+  },
+  errorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.88)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    padding: 24,
+    zIndex: 10,
+  },
+  errorTitle: {
+    color: "#fff",
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+  },
+  errorMsg: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  retryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.accent,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 999,
+    marginTop: 4,
+  },
+  retryText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
   },
 });

@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -13,11 +14,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import Colors from "@/constants/colors";
+import { useTheme } from "@/context/ThemeContext";
 import { usePlayer } from "@/context/PlayerContext";
 import { generateId } from "@/utils/format";
-
-const C = Colors.dark;
 
 type Props = {
   visible: boolean;
@@ -25,11 +24,50 @@ type Props = {
 };
 
 export function AddVideoModal({ visible, onClose }: Props) {
-  const { addVideo } = usePlayer();
+  const { addVideo, pendingShareUrl, setPendingShareUrl } = usePlayer();
+  const { C } = useTheme();
   const insets = useSafeAreaInsets();
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [error, setError] = useState("");
+  const [clipboardHint, setClipboardHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      if (pendingShareUrl) {
+        setUrl(pendingShareUrl);
+        setPendingShareUrl(null);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        checkClipboard();
+      }
+    }
+  }, [visible]);
+
+  const checkClipboard = async () => {
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (text && text.match(/^https?:\/\/.+/)) {
+        setClipboardHint(text);
+      } else {
+        setClipboardHint(null);
+      }
+    } catch {
+      setClipboardHint(null);
+    }
+  };
+
+  const handlePasteClipboard = async () => {
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (text) {
+        setUrl(text.trim());
+        setError("");
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setClipboardHint(null);
+      }
+    } catch {}
+  };
 
   const handleAdd = () => {
     const trimUrl = url.trim();
@@ -53,6 +91,7 @@ export function AddVideoModal({ visible, onClose }: Props) {
     setUrl("");
     setTitle("");
     setError("");
+    setClipboardHint(null);
     onClose();
   };
 
@@ -60,6 +99,7 @@ export function AddVideoModal({ visible, onClose }: Props) {
     setUrl("");
     setTitle("");
     setError("");
+    setClipboardHint(null);
     onClose();
   };
 
@@ -70,10 +110,10 @@ export function AddVideoModal({ visible, onClose }: Props) {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.kav}
       >
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
-          <View style={styles.handle} />
-          <View style={styles.header}>
-            <Text style={styles.title}>Add Video</Text>
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + 20, backgroundColor: C.surface, borderColor: C.border }]}>
+          <View style={[styles.handle, { backgroundColor: C.border }]} />
+          <View style={[styles.header, { borderBottomColor: C.border }]}>
+            <Text style={[styles.title, { color: C.text }]}>Add Video</Text>
             <Pressable onPress={handleClose} style={styles.closeBtn}>
               <Ionicons name="close" size={20} color={C.textSecondary} />
             </Pressable>
@@ -81,22 +121,43 @@ export function AddVideoModal({ visible, onClose }: Props) {
 
           <View style={styles.form}>
             <View style={styles.field}>
-              <Text style={styles.label}>Video URL *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="https://example.com/video.mp4"
-                placeholderTextColor={C.textMuted}
-                value={url}
-                onChangeText={(t) => { setUrl(t); setError(""); }}
-                keyboardType="url"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+              <Text style={[styles.label, { color: C.textSecondary }]}>Video URL *</Text>
+              <View style={[styles.inputRow, { backgroundColor: C.surfaceElevated, borderColor: C.border }]}>
+                <TextInput
+                  style={[styles.input, { color: C.text }]}
+                  placeholder="https://example.com/video.mp4"
+                  placeholderTextColor={C.textMuted}
+                  value={url}
+                  onChangeText={(t) => { setUrl(t); setError(""); }}
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Pressable
+                  onPress={handlePasteClipboard}
+                  style={({ pressed }) => [styles.pasteBtn, { opacity: pressed ? 0.6 : 1 }]}
+                  hitSlop={8}
+                >
+                  <Ionicons name="clipboard-outline" size={18} color={C.accent} />
+                </Pressable>
+              </View>
+              {clipboardHint && !url && (
+                <Pressable
+                  onPress={handlePasteClipboard}
+                  style={[styles.clipboardHint, { backgroundColor: C.accentSoft, borderColor: C.accent }]}
+                >
+                  <Ionicons name="clipboard-outline" size={13} color={C.accent} />
+                  <Text style={[styles.clipboardHintText, { color: C.accent }]} numberOfLines={1}>
+                    Paste: {clipboardHint}
+                  </Text>
+                </Pressable>
+              )}
             </View>
+
             <View style={styles.field}>
-              <Text style={styles.label}>Title (optional)</Text>
+              <Text style={[styles.label, { color: C.textSecondary }]}>Title (optional)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, styles.inputStandalone, { color: C.text, backgroundColor: C.surfaceElevated, borderColor: C.border }]}
                 placeholder="My awesome video"
                 placeholderTextColor={C.textMuted}
                 value={title}
@@ -104,9 +165,9 @@ export function AddVideoModal({ visible, onClose }: Props) {
               />
             </View>
 
-            <View style={styles.formatNote}>
+            <View style={[styles.formatNote, { backgroundColor: C.surfaceElevated }]}>
               <Ionicons name="information-circle-outline" size={14} color={C.textMuted} />
-              <Text style={styles.formatNoteText}>
+              <Text style={[styles.formatNoteText, { color: C.textMuted }]}>
                 Supports MP4, WebM, HLS (.m3u8), DASH, MKV, AVI, and direct stream URLs (RTSP, RTMP).
               </Text>
             </View>
@@ -114,16 +175,16 @@ export function AddVideoModal({ visible, onClose }: Props) {
             {error ? (
               <View style={styles.error}>
                 <Ionicons name="alert-circle-outline" size={14} color={C.accent} />
-                <Text style={styles.errorText}>{error}</Text>
+                <Text style={[styles.errorText, { color: C.accent }]}>{error}</Text>
               </View>
             ) : null}
 
             <Pressable
               onPress={handleAdd}
-              style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
+              style={({ pressed }) => [styles.addBtn, { backgroundColor: C.accent }, pressed && styles.addBtnPressed]}
             >
-              <Ionicons name="add-circle-outline" size={18} color={C.text} />
-              <Text style={styles.addBtnText}>Add Video</Text>
+              <Ionicons name="add-circle-outline" size={18} color="#fff" />
+              <Text style={styles.addBtnText}>Add to Library</Text>
             </Pressable>
           </View>
         </View>
@@ -141,18 +202,15 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: C.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderColor: C.border,
   },
   handle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: C.border,
     alignSelf: "center",
     marginBottom: 12,
   },
@@ -162,11 +220,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
   },
   title: {
     flex: 1,
-    color: C.text,
     fontSize: 17,
     fontFamily: "Inter_700Bold",
   },
@@ -181,33 +237,56 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    color: C.textSecondary,
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.4,
     textTransform: "uppercase",
   },
-  input: {
-    backgroundColor: C.surfaceElevated,
-    color: C.text,
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 12,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  input: {
+    flex: 1,
     paddingHorizontal: 14,
     paddingVertical: 13,
     fontSize: 14,
     fontFamily: "Inter_400Regular",
+  },
+  inputStandalone: {
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: C.border,
+  },
+  pasteBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 13,
+  },
+  clipboardHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 2,
+  },
+  clipboardHintText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
   },
   formatNote: {
     flexDirection: "row",
     gap: 6,
-    backgroundColor: C.surfaceElevated,
     padding: 10,
     borderRadius: 10,
   },
   formatNoteText: {
     flex: 1,
-    color: C.textMuted,
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     lineHeight: 16,
@@ -218,12 +297,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   errorText: {
-    color: C.accent,
     fontSize: 12,
     fontFamily: "Inter_500Medium",
   },
   addBtn: {
-    backgroundColor: C.accent,
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: "center",
@@ -237,7 +314,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   addBtnText: {
-    color: C.text,
+    color: "#fff",
     fontSize: 15,
     fontFamily: "Inter_700Bold",
   },

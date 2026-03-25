@@ -81,6 +81,8 @@ type PlayerContextType = {
   videos: VideoItem[];
   deviceVideos: VideoItem[];
   watchProgress: Record<string, WatchProgress>;
+  pendingShareUrl: string | null;
+  setPendingShareUrl: (url: string | null) => void;
   refreshDeviceVideos: () => Promise<void>;
   addVideo: (video: VideoItem) => void;
   removeVideo: (id: string) => void;
@@ -139,7 +141,7 @@ const DEFAULT_STATE: PlayerState = {
   isPlaying: false,
   isMuted: false,
   volume: 1,
-  brightness: 0.8,
+  brightness: 1,
   playbackRate: 1,
   quality: "Auto",
   fitMode: "contain",
@@ -179,6 +181,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [deviceVideos, setDeviceVideos] = useState<VideoItem[]>([]);
   const [hiddenDeviceIds, setHiddenDeviceIds] = useState<Set<string>>(new Set());
   const [watchProgress, setWatchProgress] = useState<Record<string, WatchProgress>>({});
+  const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
   const watchProgressRef = useRef<Record<string, WatchProgress>>({});
   const sleepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -370,8 +373,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const togglePlay = useCallback(() => setState((p) => ({ ...p, isPlaying: !p.isPlaying })), []);
   const toggleMute = useCallback(() => setState((p) => ({ ...p, isMuted: !p.isMuted })), []);
-  const setVolume = useCallback((v: number) => setState((p) => ({ ...p, volume: v, isMuted: v === 0 })), []);
-  const setBrightness = useCallback((v: number) => setState((p) => ({ ...p, brightness: Math.max(0.05, Math.min(1, v)) })), []);
+
+  const setVolume = useCallback((v: number) => {
+    const clamped = Math.max(0, Math.min(2, v));
+    setState((p) => ({ ...p, volume: clamped, isMuted: clamped === 0 }));
+  }, []);
+
+  const setBrightness = useCallback((v: number) => {
+    setState((p) => ({ ...p, brightness: Math.max(0.05, Math.min(2, v)) }));
+  }, []);
+
   const setPlaybackRate = useCallback((rate: PlaybackSpeed) => setState((p) => ({ ...p, playbackRate: rate })), []);
   const setQuality = useCallback((q: VideoQuality) => setState((p) => ({ ...p, quality: q })), []);
   const setFitMode = useCallback((m: FitMode) => setState((p) => ({ ...p, fitMode: m })), []);
@@ -407,6 +418,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   return (
     <PlayerContext.Provider value={{
       state, videos, deviceVideos: visibleDeviceVideos, watchProgress,
+      pendingShareUrl, setPendingShareUrl,
       refreshDeviceVideos,
       addVideo, removeVideo, playVideo,
       togglePlay, toggleMute, setVolume, setBrightness,

@@ -25,7 +25,33 @@ const DARK = {
   tabIconSelected: "#FF0033",
 };
 
-export default {
-  dark: DARK,
-  light: DARK,
+const LIGHT = {
+  background: "#F2F2F7",
+  surface: "#FFFFFF",
+  surfaceElevated: "#EBEBF0",
+  surfaceGlass: "rgba(255, 255, 255, 0.88)",
+  border: "rgba(0, 0, 0, 0.1)",
+  borderStrong: "rgba(0, 0, 0, 0.2)",
+  text: "#1C1C1E",
+  textSecondary: "rgba(0, 0, 0, 0.6)",
+  textMuted: "rgba(0, 0, 0, 0.38)",
+  accent: "#FF0033",
+  accentSoft: "rgba(255, 0, 51, 0.1)",
+  accentGlow: "rgba(255, 0, 51, 0.3)",
+  controlBg: "rgba(0, 0, 0, 0.07)",
+  controlBgActive: "rgba(0, 0, 0, 0.12)",
+  overlay: "rgba(0, 0, 0, 0.5)",
+  overlayLight: "rgba(0, 0, 0, 0.25)",
+  progress: "#FF0033",
+  buffer: "rgba(0, 0, 0, 0.2)",
+  track: "rgba(0, 0, 0, 0.15)",
+  scrubber: "#1C1C1E",
+  tabBar: "#FFFFFF",
+  tint: "#FF0033",
+  tabIconDefault: "rgba(0, 0, 0, 0.35)",
+  tabIconSelected: "#FF0033",
 };
+
+export type ThemeColors = typeof DARK;
+
+export default { dark: DARK, light: LIGHT };
